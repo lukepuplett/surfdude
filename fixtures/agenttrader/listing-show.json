@@ -1,0 +1,91 @@
+{
+  "status": 200,
+  "message": "OK",
+  "data": [
+    {
+      "id": "lst_seed01",
+      "version": "v3",
+      "state": "live",
+      "reg": "AB07 CDE",
+      "registry": "dvla",
+      "agentId": "ag_seller01",
+      "askingPriceGbp": 3000,
+      "conditionNotes": "Small dent rear bumper. Starts first time.",
+      "latitude": 51.06,
+      "longitude": 0.16,
+      "locationName": "Crowborough, East Sussex",
+      "runs": "drives",
+      "roadLegal": true,
+      "deliveryAvailable": false,
+      "expiresAt": "2026-12-01T12:00:00Z",
+      "photos": [
+        "/listings/lst_seed01/photos/1",
+        "/listings/lst_seed01/photos/2"
+      ],
+      "facts": [
+        {
+          "name": "make",
+          "value": "MINI",
+          "source": "DVLA VES",
+          "fetchedAt": "2026-11-01T10:00:00Z",
+          "check": "https://vehicleenquiry.service.gov.uk/"
+        },
+        {
+          "name": "model",
+          "value": "COOPER",
+          "source": "DVLA VES",
+          "fetchedAt": "2026-11-01T10:00:00Z",
+          "check": "https://vehicleenquiry.service.gov.uk/"
+        },
+        {
+          "name": "lastMotMileage",
+          "value": 98123,
+          "source": "DVSA MOT history",
+          "fetchedAt": "2026-11-01T10:00:00Z",
+          "check": "https://www.check-mot.service.gov.uk/"
+        }
+      ],
+      "trust": {
+        "verified": false,
+        "warnings": []
+      },
+      "sellerStatements": {
+        "runs": "Seller says: drives (starts and can be driven today). Not a verified fact.",
+        "roadLegal": "Seller says: legal on public roads today. Not a verified fact."
+      }
+    }
+  ],
+  "_links": [
+    {"rel": "self", "href": "/listings/lst_seed01", "method": "GET"},
+    {
+      "rel": "human-page",
+      "href": "/listings/lst_seed01",
+      "method": "GET",
+      "type": "text/html",
+      "title": "Read-only page for the owner, with photos"
+    }
+  ],
+  "_actions": [
+    {
+      "rel": "make-offer",
+      "title": "Make an offer",
+      "action": "/listings/lst_seed01/offers",
+      "method": "POST",
+      "enctype": "application/json",
+      "requires": ["agent-session"],
+      "price": {"amount": "0.50", "currency": "USDC", "note": "Offer fee when priced; not live in slice one"}
+    },
+    {
+      "rel": "change-price",
+      "title": "Change the asking price (owner only)",
+      "action": "/listings/lst_seed01",
+      "method": "PATCH",
+      "enctype": "application/json",
+      "requires": ["agent-session"],
+      "ifMatch": "v3",
+      "fields": [
+        {"name": "askingPriceGbp", "required": true, "value": 3000, "schema": {"type": "integer", "minimum": 1}}
+      ]
+    }
+  ]
+}

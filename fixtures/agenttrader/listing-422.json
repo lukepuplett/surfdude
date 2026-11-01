@@ -1,0 +1,20 @@
+{
+  "status": 422,
+  "message": "Unable to create listing. The reg is required.",
+  "data": [
+    {"field": "reg", "code": "required", "message": "is required"},
+    {"field": "registry", "code": "enum", "message": "is not a registry we support"}
+  ],
+  "_actions": [
+    {
+      "rel": "create-listing",
+      "title": "Try again",
+      "action": "/listings",
+      "method": "POST",
+      "enctype": "application/json",
+      "fields": [
+        {"name": "reg", "required": true, "schema": {"type": "string"}}
+      ]
+    }
+  ]
+}

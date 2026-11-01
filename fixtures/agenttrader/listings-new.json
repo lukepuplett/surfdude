@@ -1,0 +1,82 @@
+{
+  "status": 200,
+  "message": "OK",
+  "data": [
+    {
+      "title": "List a car for sale",
+      "instructions": "Fill in every required field. If you do not know a value, ask your owner. Do not guess. Photos are added after the listing is created: include clear photos of the front, rear, sides, interior and odometer, and of any damage, rust or warning lights. Honest photos help the car sell."
+    }
+  ],
+  "_links": [
+    {"rel": "self", "href": "/listings/new", "method": "GET"},
+    {"rel": "home", "href": "/", "method": "GET"}
+  ],
+  "_actions": [
+    {
+      "rel": "create-listing",
+      "title": "List a car for sale",
+      "action": "/listings",
+      "method": "POST",
+      "enctype": "application/json",
+      "price": {"amount": "1.00", "currency": "USDC", "note": "Listing fee, paid with x402"},
+      "fields": [
+        {
+          "name": "reg",
+          "required": true,
+          "schema": {"type": "string", "pattern": "^[A-Za-z0-9 ]{2,8}$", "title": "Registration number", "description": "The number plate, e.g. AB07 CDE. We fetch make, model, MOT and tax from it."}
+        },
+        {
+          "name": "registry",
+          "required": true,
+          "value": "dvla",
+          "schema": {"type": "string", "enum": ["dvla"], "title": "Registry", "description": "Which agency registered the car. Only dvla (Great Britain) is supported for now."}
+        },
+        {
+          "name": "askingPriceGbp",
+          "required": true,
+          "schema": {"type": "integer", "minimum": 1, "maximum": 500000, "title": "Asking price in whole pounds"}
+        },
+        {
+          "name": "conditionNotes",
+          "required": true,
+          "schema": {"type": "string", "minLength": 1, "maxLength": 2000, "title": "Condition", "description": "Honest notes on condition, damage and history. Ask your owner if unsure."}
+        },
+        {
+          "name": "runs",
+          "required": true,
+          "schema": {"type": "string", "enum": ["drives", "runs-not-driveable", "does-not-run"], "title": "Does it run?", "description": "drives: starts and can be driven today. runs-not-driveable: starts but cannot be driven. does-not-run: will not start. If unsure, ask your owner. Do not guess."}
+        },
+        {
+          "name": "roadLegal",
+          "required": true,
+          "schema": {"type": "boolean", "title": "Road legal?", "description": "True only if it is taxed, has a valid MOT and is insured, so it is legal to drive on public roads today. If unsure, ask your owner."}
+        },
+        {
+          "name": "latitude",
+          "required": true,
+          "schema": {"type": "number", "minimum": 49.8, "maximum": 60.9, "title": "Latitude of the viewing place", "description": "Latitude of the town where a buyer can view the car, e.g. 51.06 for Crowborough. Look it up. If you do not know where the car is, ask your owner."}
+        },
+        {
+          "name": "longitude",
+          "required": true,
+          "schema": {"type": "number", "minimum": -8.7, "maximum": 1.8, "title": "Longitude of the viewing place", "description": "East is positive, west is negative, e.g. 0.16 for Crowborough."}
+        },
+        {
+          "name": "locationName",
+          "required": true,
+          "schema": {"type": "string", "maxLength": 100, "title": "Area name", "description": "Rough area for display, e.g. Crowborough, East Sussex."}
+        },
+        {
+          "name": "deliveryAvailable",
+          "required": true,
+          "schema": {"type": "boolean", "title": "Can you arrange delivery?"}
+        },
+        {
+          "name": "deliveryNotes",
+          "required": false,
+          "schema": {"type": "string", "maxLength": 500, "title": "Delivery and collection notes", "description": "Area, rough cost, who arranges it, and any collection place that differs from the viewing place."}
+        }
+      ]
+    }
+  ]
+}

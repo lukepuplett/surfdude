@@ -1,0 +1,67 @@
+{
+  "dialect": "simple",
+  "cases": [
+    {
+      "name": "Surfdude's own media type: forms, options, a template, a method and a version",
+      "file": "root.json",
+      "contentType": "application/simple-hypertext+json",
+      "headers": {},
+      "status": 200,
+      "expect": {
+        "status": 200,
+        "rels": [
+          "registrations",
+          "registration-finder",
+          "update-contact-details"
+        ],
+        "controls": {
+          "registrations": {
+            "form": true,
+            "method": "GET",
+            "inputs": [
+              "skip",
+              "take"
+            ],
+            "required": []
+          },
+          "registration-finder": {
+            "form": true,
+            "method": "GET",
+            "inputs": [
+              "status",
+              "email"
+            ],
+            "required": [
+              "status",
+              "email"
+            ]
+          },
+          "update-contact-details": {
+            "form": true,
+            "method": "PUT",
+            "inputs": [
+              "email"
+            ],
+            "required": [
+              "email"
+            ],
+            "ifMatch": "\"v2\""
+          }
+        },
+        "items": [
+          {
+            "rels": [
+              "self"
+            ],
+            "controls": {
+              "self": {
+                "form": false,
+                "method": "GET"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

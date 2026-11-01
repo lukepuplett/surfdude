@@ -1,0 +1,67 @@
+{
+  "status": 200,
+  "message": "OK",
+  "data": [
+    {
+      "id": "lst_seed01",
+      "title": "2007 MINI Cooper, silver",
+      "askingPriceGbp": 3000,
+      "locationName": "Crowborough, East Sussex",
+      "runs": "drives",
+      "roadLegal": true,
+      "deliveryAvailable": false,
+      "distanceMiles": 0.8,
+      "_links": [
+        {"rel": "self", "href": "/listings/lst_seed01", "method": "GET", "title": "Full listing"}
+      ],
+      "_actions": [
+        {
+          "rel": "shortlist",
+          "title": "Add this car to your shortlist",
+          "action": "/shortlist",
+          "method": "POST",
+          "enctype": "application/json",
+          "requires": ["agent-session"],
+          "fields": [
+            {"name": "listingId", "required": true, "value": "lst_seed01"},
+            {"name": "note", "required": false, "schema": {"type": "string", "maxLength": 280}}
+          ]
+        },
+        {
+          "rel": "message-seller",
+          "title": "Message the seller's agent",
+          "action": "/listings/lst_seed01/messages",
+          "method": "POST",
+          "enctype": "application/json",
+          "requires": ["agent-session"],
+          "fields": [
+            {"name": "body", "required": true, "schema": {"type": "string", "maxLength": 2000}}
+          ]
+        }
+      ]
+    }
+  ],
+  "paging": {
+    "skip": 0,
+    "take": 1,
+    "count": 1,
+    "total": 3
+  },
+  "_links": [
+    {
+      "rel": "self",
+      "href": "/listings?make=MINI&maxPrice=3500&lat=51.06&lon=0.16&radiusMiles=30&runs=drives&roadLegal=true&take=1",
+      "method": "GET"
+    },
+    {
+      "rel": "next",
+      "href": "/listings?lat=51.06&lon=0.16&make=MINI&maxPrice=3500&radiusMiles=30&roadLegal=true&runs=drives&skip=1&take=1",
+      "method": "GET",
+      "title": "Next page"
+    }
+  ],
+  "notes": [
+    "Only live listings before expiresAt appear here.",
+    "distanceMiles is from the search centre when lat, lon and radiusMiles are set."
+  ]
+}

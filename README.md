@@ -2,6 +2,51 @@
 
 Because you can surf the best APIs.
 
+A hypermedia client that **drives an API the way a person drives a website**: start at the front door, follow links, submit forms. Nothing in a journey names a URL or an HTTP method, only link names (`rel`s). So a journey that runs proves the API really can be driven by its own hypertext, and one that cannot says what the page did offer.
+
+## What is in here
+
+| Folder | What |
+|--------|------|
+| [csharp/](csharp/) | The original client, with its `simple-hypertext+json` dialect. [Jump to its README](#c) |
+| [go/](go/) | The Go client: the same idea, a richer model, pluggable **dialects**, an explorer and a command-line tool |
+| [docs/](docs/) | [model.md](docs/model.md): the language-neutral model and the journey verbs. [dialects.md](docs/dialects.md): how a server's spelling is read |
+| [fixtures/](fixtures/) | Responses and expectations that every implementation must agree on |
+| [scripts/](scripts/) | `journey-agenttrader.sh` starts a local AgentTrader and drives it |
+
+## Go in thirty seconds
+
+```go
+s, _ := surf.New("http://localhost:8080", surf.WithDialects(agenttrader.New()))
+home, _ := s.Root(ctx)
+results, _ := home.Submit(ctx, "search-listings", surf.Values{"make": "MINI"})
+first, _ := results.Item(0)
+_, err := first.Submit(ctx, "shortlist", surf.Values{"note": "nice colour"})
+```
+
+```sh
+cd go && go run ./cmd/surf show http://localhost:8080
+cd go && go run ./cmd/surf explore http://localhost:8080   # crawl everything reachable
+```
+
+Design an API by writing the journey first. The errors tell you what to add to the hypertext until the journey runs.
+
+## Status and what is next
+
+The Go client is new (November 2026): two dialects, an explorer, a command-line tool and first journeys against AgentTrader. The C# client is the original and has not changed beyond moving into `csharp/`.
+
+- **Rename this repository** from `surfdude-csharp` to `surfdude`. The Go module path (`github.com/lukepuplett/surfdude/go`) already assumes it. Until then, use a `go.work` or a `replace`.
+- **Teach the C# client the AgentTrader envelope.** It already has the seam (`IHypertextResourceFormatter`); the shared [fixtures](fixtures/) say what a correct reading looks like.
+- **A small dialect for x402 `402` bodies,** which are not the AgentTrader envelope.
+- **More dialects:** HAL, Siren, and HTML (`a` is a link, `form` is a form).
+- **CI for Go** and a first tag, `go/v0.1.0`.
+- **The C# model** is thinner than the Go one: inputs have a name and an optional flag, with no schema. It can grow to match [docs/model.md](docs/model.md).
+
+---
+
+<a id="c"></a>
+# C# (the original README)
+
 A simple little hypermedia client that dynamically drives a REST API. You can use this to test that an API is genuinely RESTful, i.e. it can be driven entirely by links and hypertext transfer, or you can use this in your application to work a backend API instead of a static URL template based client like Refit.
 
 ## Surfdude helps you build radically better APIs

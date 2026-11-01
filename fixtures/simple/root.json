@@ -1,0 +1,32 @@
+{
+  "links": [
+    {
+      "rel": "registrations",
+      "description": "View the registrations progressing and complete.",
+      "href": "https://example.test/registrations",
+      "form": [
+        {"name": "skip", "label": "The number of items to skip over.", "isOptional": true},
+        {"name": "take", "label": "The number of items to return.", "isOptional": true}
+      ]
+    },
+    {
+      "rel": "registration-finder",
+      "description": "Lets an applicant find their registration in the system.",
+      "href": "https://example.test/registrations/{status}",
+      "form": [
+        {"name": "status", "options": ["active", "inactive", "any"]},
+        {"name": "email"}
+      ]
+    },
+    {
+      "rel": "update-contact-details",
+      "href": "https://example.test/registrations/7/contact",
+      "method": "PUT",
+      "ifMatch": "\"v2\"",
+      "form": [{"name": "email"}]
+    }
+  ],
+  "items": [
+    {"links": [{"rel": "self", "href": "https://example.test/registrations/7"}]}
+  ]
+}

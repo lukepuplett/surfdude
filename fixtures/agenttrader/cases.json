@@ -1,0 +1,240 @@
+{
+  "dialect": "agenttrader",
+  "cases": [
+    {
+      "name": "home as it is heading: a typed GET search, register and sign-in",
+      "file": "home.json",
+      "contentType": "application/json",
+      "headers": {
+        "Link": "<https://agenttrader.net/profiles/envelope/v1>; rel=\"profile\""
+      },
+      "status": 200,
+      "expect": {
+        "status": 200,
+        "rels": [
+          "self",
+          "facets",
+          "new-listing",
+          "search-listings",
+          "register",
+          "sign-in"
+        ],
+        "controls": {
+          "self": {
+            "form": false,
+            "method": "GET"
+          },
+          "new-listing": {
+            "form": false,
+            "method": "GET",
+            "requires": [
+              "agent-session"
+            ]
+          },
+          "search-listings": {
+            "form": true,
+            "method": "GET",
+            "inputs": [
+              "make",
+              "model",
+              "maxPrice",
+              "lat",
+              "lon",
+              "radiusMiles",
+              "runs",
+              "roadLegal",
+              "deliveryAvailable",
+              "skip",
+              "take"
+            ],
+            "required": []
+          },
+          "register": {
+            "form": true,
+            "method": "POST",
+            "inputs": [
+              "email",
+              "hashcash"
+            ],
+            "required": [
+              "email",
+              "hashcash"
+            ]
+          },
+          "sign-in": {
+            "form": true,
+            "method": "POST",
+            "inputs": [
+              "agentKey",
+              "password"
+            ],
+            "required": [
+              "agentKey",
+              "password"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "search results: paging, next link, and controls on each item",
+      "file": "listings-search.json",
+      "contentType": "application/json",
+      "headers": {
+        "Link": "<https://agenttrader.net/profiles/envelope/v1>; rel=\"profile\""
+      },
+      "status": 200,
+      "expect": {
+        "status": 200,
+        "notes": 2,
+        "paging": {
+          "skip": 0,
+          "take": 1,
+          "count": 1,
+          "total": 3
+        },
+        "rels": [
+          "self",
+          "next"
+        ],
+        "controls": {
+          "next": {
+            "form": false,
+            "method": "GET"
+          }
+        },
+        "items": [
+          {
+            "rels": [
+              "self",
+              "shortlist",
+              "message-seller"
+            ],
+            "controls": {
+              "self": {
+                "form": false,
+                "method": "GET"
+              },
+              "shortlist": {
+                "form": true,
+                "method": "POST",
+                "inputs": [
+                  "listingId",
+                  "note"
+                ],
+                "required": [
+                  "listingId"
+                ],
+                "requires": [
+                  "agent-session"
+                ]
+              },
+              "message-seller": {
+                "form": true,
+                "method": "POST",
+                "inputs": [
+                  "body"
+                ],
+                "required": [
+                  "body"
+                ],
+                "requires": [
+                  "agent-session"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "one listing: an action that expects a version",
+      "file": "listing-show.json",
+      "contentType": "application/json",
+      "headers": {
+        "Link": "<https://agenttrader.net/profiles/envelope/v1>; rel=\"profile\""
+      },
+      "status": 200,
+      "expect": {
+        "status": 200,
+        "rels": [
+          "self",
+          "human-page",
+          "make-offer",
+          "change-price"
+        ],
+        "controls": {
+          "change-price": {
+            "form": true,
+            "method": "PATCH",
+            "inputs": [
+              "askingPriceGbp"
+            ],
+            "required": [
+              "askingPriceGbp"
+            ],
+            "requires": [
+              "agent-session"
+            ],
+            "ifMatch": "v3"
+          },
+          "human-page": {
+            "form": false,
+            "method": "GET"
+          }
+        }
+      }
+    },
+    {
+      "name": "a refusal lists its problems and offers the form to try again",
+      "file": "listing-422.json",
+      "contentType": "application/json",
+      "headers": {
+        "Link": "<https://agenttrader.net/profiles/envelope/v1>; rel=\"profile\""
+      },
+      "status": 422,
+      "expect": {
+        "status": 422,
+        "rels": [
+          "create-listing"
+        ],
+        "problems": [
+          {
+            "field": "reg",
+            "code": "required"
+          },
+          {
+            "field": "registry",
+            "code": "enum"
+          }
+        ],
+        "controls": {
+          "create-listing": {
+            "form": true,
+            "method": "POST",
+            "inputs": [
+              "reg"
+            ],
+            "required": [
+              "reg"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "recognised by shape when the profile link is missing",
+      "file": "listings-search.json",
+      "contentType": "application/json",
+      "headers": {},
+      "status": 200,
+      "expect": {
+        "status": 200,
+        "rels": [
+          "self",
+          "next"
+        ]
+      }
+    }
+  ]
+}
