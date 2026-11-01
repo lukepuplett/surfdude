@@ -15,13 +15,13 @@ steps:
   displayName: 'Restore NuGet packages'
   inputs:
     command: 'restore'
-    projects: '**/*.csproj'
+    projects: 'csharp/**/*.csproj'
 - task: DotNetCoreCLI@2
   displayName: 'Run tests'
   enabled: false # DISABLED!
   inputs:
     command: 'test'
-    projects: '**/*.csproj'
+    projects: 'csharp/**/*.csproj'
     publishTestResults: true # Optional
     #testRunTitle: # Optional
 - task: DotNetCoreCLI@2
@@ -29,7 +29,7 @@ steps:
   inputs:
     command: 'pack'
     configuration: 'release'
-    packagesToPack: 'src/**/Evoq.Surfdude*.csproj'
+    packagesToPack: 'csharp/src/**/Evoq.Surfdude*.csproj'
     packDirectory: '$(build.artifactStagingDirectory)'
     verbosityPack: 'normal'
     # versioningScheme: 'byBuildNumber'
@@ -37,7 +37,7 @@ steps:
   displayName: 'Push to NuGet.org'
   inputs:
     targetType: 'filePath'
-    filePath: 'build/Publish-ToNuGet.ps1'
+    filePath: 'csharp/build/Publish-ToNuGet.ps1'
     arguments: '-PackageSpec $(Build.ArtifactStagingDirectory)/Surfdude*.nupkg -ApiKey $(azure-pipelines-evoq-nuget-apikey)'
 
 #- task: DotNetCoreCLI@2
