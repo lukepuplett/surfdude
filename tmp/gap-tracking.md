@@ -25,6 +25,7 @@ Last updated: 2026-11-02
 | GAP-09 | JSON Schema `format` | A value that does not match `format: email` is rejected before sending. Other formats are not yet checked. | `checkFormat` in `surf/values.go` | `_check_format` in `surf/values.py` |
 | GAP-10 | Duplicate `rel` | A resource can report which rels appear on more than one control. This is reporting only; it does not yet change which control wins. | `Resource.DuplicateRels` | `Resource.duplicate_rels` |
 | GAP-11 | A response no dialect can read | The page that comes back with the error can be asked for rels, notes, items and the body without a panic (Go dereferenced a nil `Resource`), and `UnexpectedStatusError` carries `Header` and `Body`, so a test can read `Retry-After` or `WWW-Authenticate` or see a proxy's plain-text page from the error alone. | `finish` in `surf/surf.go`, `UnexpectedStatusError.Header` and `.Body` | not checked yet |
+| GAP-12 | Sign in again | A surfer can be given `WithSignIn(func)`. It signs in before sending when a control needs a session and no token is held, and signs in and replays the request once on a 401. Concurrent steps share one sign-in; an expected 401 and the sign-in step itself never trigger it. | `WithSignIn`, `signInAgain` in `surf/surf.go` | not built |
 
 ## Behaviour to know about
 
@@ -62,12 +63,12 @@ Changes a maintainer should know about:
 ## Still open (not covered by the tests above)
 
 - Python is synchronous only. An async client (`httpx.AsyncClient`) is a separate piece of work and needs its own retry and sleep seam.
-- The credential hook for anything beyond a bearer token (signing, refresh on 401) is not designed. Today it belongs in the HTTP client's pipeline.
+- Go can sign in again on a 401 (GAP-12). Python and C# cannot. Request signing and anything beyond a bearer token is still not designed; today it belongs in the HTTP client's pipeline.
 - C# has no per-step retry or timeout. Both belong in the `HttpClient` pipeline, so one wave cannot opt out of the surfer's policy.
 - C# does not run the shared `/fixtures` conformance cases.
 - Cookie sessions: only `Authorization: Bearer` is modelled.
 - Redirect policy is unspecified, with no strict mode.
-- Nothing sets the bearer token automatically after a sign-in response.
+- In Go the sign-in hook returns the token and the surfer keeps it. In Python and C# nothing sets the bearer token automatically after a sign-in response.
 - The x402 payment flow itself.
 - Python still lacks Explore, a command-line tool, `surftest`-style helpers and live AgentTrader
   journeys.

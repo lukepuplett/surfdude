@@ -18,6 +18,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -35,6 +36,8 @@ type Surfer struct {
 	reg     *dialect.Registry
 	mu      sync.RWMutex // guards token, which SetBearer may change while requests are in flight
 	token   string
+	signIn  SignInFunc
+	signMu  sync.Mutex // one sign-in at a time, so steps that fail together share it
 	agent   string
 	retry   RetryPolicy
 	sleep   func(context.Context, time.Duration) error
@@ -54,6 +57,17 @@ func WithDialects(ds ...dialect.Dialect) Option {
 
 // WithBearer sets the access token sent as Authorization: Bearer.
 func WithBearer(token string) Option { return func(s *Surfer) { s.token = token } }
+
+// SignInFunc signs in and returns the access token to use. from is the page that showed the need: the
+// page whose control requires a session, or the page the server sent with a 401. It carries the
+// server's advice and, if the API offers one, a sign-in control to follow.
+type SignInFunc func(ctx context.Context, from *Page) (token string, err error)
+
+// WithSignIn sets how the surfer gets a session. The hook runs when a control needs a session and the
+// surfer holds no token, and when a step is refused with 401. It runs once for any number of steps
+// that need it at the same moment, and a step replays at most once after it. Without it, a step that
+// needs a session and has no token is refused before any request is sent.
+func WithSignIn(f SignInFunc) Option { return func(s *Surfer) { s.signIn = f } }
 
 // WithRetry sets the retry policy for every step. Without it nothing is retried. A step can override
 // it with Retrying.
@@ -94,6 +108,38 @@ func (s *Surfer) SetBearer(token string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.token = token
+}
+
+// signingInKey marks a context as belonging to the sign-in hook, so the steps the hook takes cannot
+// call the hook again.
+type signingInKey struct{}
+
+func signingIn(ctx context.Context) bool {
+	_, ok := ctx.Value(signingInKey{}).(bool)
+	return ok
+}
+
+// signInAgain runs the hook, one caller at a time. stale is the token the failed request used, or ""
+// when there was none. If the token has changed by the time this caller gets its turn, another step
+// has already signed in, and there is nothing to do but send the request again.
+func (s *Surfer) signInAgain(ctx context.Context, from *Page, stale string) error {
+	s.signMu.Lock()
+	defer s.signMu.Unlock()
+
+	if s.bearer() != stale {
+		return nil
+	}
+
+	token, err := s.signIn(context.WithValue(ctx, signingInKey{}, true), from)
+	if err != nil {
+		return fmt.Errorf("Signing in again failed: %w", err)
+	}
+	if token == "" {
+		return fmt.Errorf("Signing in again gave no token, so the request cannot be sent again.")
+	}
+	s.SetBearer(token)
+
+	return nil
 }
 
 // bearer returns the current access token.
@@ -187,8 +233,28 @@ func (s *Surfer) do(req *http.Request, step string, expected func(int) bool, pol
 	}
 	req.Header.Set("User-Agent", s.agent)
 
+	signedInAgain := false
 	for attempt := 1; ; attempt++ {
 		ex := s.exchange(req)
+
+		// A 401 means the session is gone. If the surfer knows how to sign in, it does that once and
+		// sends the same request again. A step that expects 401 is testing the refusal, so it is left
+		// alone, and so is the sign-in step itself (see signingIn).
+		if s.signIn != nil && !signedInAgain && ex.err == nil && ex.resp.StatusCode == http.StatusUnauthorized &&
+			!expected(http.StatusUnauthorized) && !signingIn(req.Context()) && replayable(req) {
+			refused, _ := s.finish(req, step, expected, ex, attempt) // the 401 as a page, for the hook to read
+			stale := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
+			if err := s.signInAgain(req.Context(), refused, stale); err != nil {
+				return refused, fmt.Errorf("Unable to %s. %w", step, err)
+			}
+			next, err := rewind(req)
+			if err != nil {
+				return refused, fmt.Errorf("Unable to %s. The request body could not be rebuilt after signing in: %w", step, err)
+			}
+			next.Header.Set("Authorization", "Bearer "+s.bearer())
+			req, signedInAgain = next, true
+			continue
+		}
 
 		failed := ex.err != nil || !expected(ex.resp.StatusCode)
 		if failed && req.Context().Err() == nil && replayable(req) {
@@ -395,6 +461,14 @@ func (p *Page) take(ctx context.Context, controls []hypertext.Control, where, re
 			offered[i] = cc.Rel
 		}
 		return nil, &hypertext.RelNotFoundError{Rel: rel, Where: where, Offered: offered}
+	}
+
+	// A control that needs a session, with no token held: sign in first if we know how, rather than
+	// send a request the server is bound to refuse.
+	if p.s.signIn != nil && len(c.Requires) > 0 && p.s.bearer() == "" && !signingIn(ctx) {
+		if err := p.s.signInAgain(ctx, p, ""); err != nil {
+			return nil, fmt.Errorf("Unable to follow %q. %w", rel, err)
+		}
 	}
 
 	if err := preflight(c, p.s.bearer()); err != nil {

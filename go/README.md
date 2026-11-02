@@ -66,6 +66,26 @@ if errors.As(err, &refused) && refused.Status == 429 {
 }
 ```
 
+### Signing in again
+
+Give the surfer a way to get a session and a journey never has to mention tokens:
+
+```go
+signIn := func(ctx context.Context, from *surf.Page) (string, error) {
+	// from is the page that showed the need: the page whose control requires a session, or the
+	// page the server sent with a 401. If the API offers a sign-in control it is right there.
+	next, err := from.Submit(ctx, "sign-in", surf.Values{"credential": credential})
+	if err != nil {
+		return "", err
+	}
+	var got struct{ Token string `json:"token"` }
+	return got.Token, next.Read(&got)
+}
+s := surftest.New(t, url, surf.WithDialects(agenttrader.New()), surf.WithSignIn(signIn))
+```
+
+The hook runs in two situations. When a control needs a session and the surfer holds no token, it signs in first instead of refusing the step. When a step is refused with a 401, it signs in and sends the same request again, once. Any number of steps that fail together share one sign-in. A step that says `surf.Expect(401)` is testing the refusal, so it is left alone, and the sign-in step itself can never call the hook. Without `WithSignIn` nothing changes: a step that needs a session with no token is refused before any request is sent.
+
 See [../docs/model.md](../docs/model.md) and [../docs/dialects.md](../docs/dialects.md).
 
 ## Publishing
