@@ -26,6 +26,18 @@ The registry tries dialects in order until **`Matches`** succeeds, then **`Read`
 | [fixtures/](fixtures/) | Responses and expectations that every implementation must agree on |
 | [scripts/](scripts/) | `journey-agenttrader.sh` starts a local AgentTrader and drives it |
 | [tmp/gap-tracking.md](tmp/gap-tracking.md) | Behaviour gaps found in review, what fixed each one, and what is still open |
+| [docs/releasing.md](docs/releasing.md) | **One tag → NuGet, PyPI, Go module, `surf` binaries** — accounts, secrets, bump scripts |
+
+## Install (after a release)
+
+See [docs/releasing.md](docs/releasing.md) for accounts and tagging. Current line **0.1.0** (see [VERSION](VERSION)):
+
+| | Command |
+|---|---------|
+| **Go library** | `go get github.com/lukepuplett/surfdude/go/surf@v0.1.0` |
+| **Go CLI** | `go install github.com/lukepuplett/surfdude/go/cmd/surf@v0.1.0` or download **`surf`** from [GitHub Releases](https://github.com/lukepuplett/surfdude-csharp/releases) |
+| **Python** | `uv add surfdude==0.1.0` |
+| **.NET** | `dotnet add package Surfdude.SimpleJson.Client --version 0.1.0` |
 
 ## Go sample ride
 
@@ -141,7 +153,7 @@ The Go client is new (November 2026): two dialects, an explorer, a command-line 
 - **More dialects:** HAL, Siren, and HTML (`a` is a link, `form` is a form).
 - **CI for C#** — `dotnet test` on [csharp/tests/Evoq.Surfdude.Tests](csharp/tests/Evoq.Surfdude.Tests); see [csharp/README.md](csharp/README.md).
 - **CI for Go** and a first tag, `go/v0.1.0`.
-- **CI for Python** (`uv run pytest` in `python/`) on the same fixtures.
+- **Release plumbing** is in place ([docs/releasing.md](docs/releasing.md), GitHub Actions, `VERSION`); add **NuGet** and **PyPI** secrets and push **`v*`** tags to publish.
 - **The C# model** is thinner than the Go one: inputs have a name and an optional flag, with no schema. It can grow to match [docs/model.md](docs/model.md).
 
 ---

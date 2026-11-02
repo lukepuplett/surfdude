@@ -7,6 +7,11 @@ authors = [{ name = "Luke Puplett", email = "lpuplett@pacificam.co.uk" }]
 requires-python = ">=3.12"
 dependencies = ["httpx>=0.28.1"]
 
+[project.urls]
+Homepage = "https://github.com/lukepuplett/surfdude-csharp"
+Repository = "https://github.com/lukepuplett/surfdude-csharp"
+Documentation = "https://github.com/lukepuplett/surfdude-csharp/blob/master/README.md"
+
 [dependency-groups]
 dev = ["pytest>=9.0", "ruff>=0.17"]
 

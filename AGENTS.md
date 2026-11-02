@@ -43,6 +43,8 @@ cd csharp && dotnet test Evoq.Surfdude.sln
 
 Go live journeys may skip if AgentTrader is unreachable from the environment.
 
+**Releasing:** [docs/releasing.md](docs/releasing.md) — bump `VERSION`, tag `vX.Y.Z`, GitHub Actions publishes NuGet/PyPI/GoReleaser when secrets are set. Scripts under `scripts/tag-release/`.
+
 ---
 
 ## Implementation rules

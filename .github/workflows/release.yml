@@ -1,0 +1,100 @@
+name: Release
+
+# Push a semver tag vX.Y.Z (after scripts/tag-release/bump-version.sh and tests).
+# Add repository secrets: NUGET_API_KEY, PYPI_API_TOKEN (PyPI → Account settings → API tokens).
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag matches VERSION file
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF#refs/tags/v}"
+          file="$(tr -d '[:space:]' < VERSION)"
+          test "$tag" = "$file"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: go/go.sum
+      - run: go test ./...
+        working-directory: go
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --all-groups && uv run pytest
+        working-directory: python
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - run: dotnet test csharp/Evoq.Surfdude.sln -c Release
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag Go module (go/vX.Y.Z)
+        run: |
+          set -euo pipefail
+          ver="${GITHUB_REF#refs/tags/}"
+          modtag="go/${ver#v}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$modtag" "${{ github.sha }}"
+          git push origin "$modtag"
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Pack and push NuGet
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          set -euo pipefail
+          ver="${GITHUB_REF#refs/tags/v}"
+          dotnet pack csharp/Evoq.Surfdude.sln -c Release \
+            -p:Version="$ver" -p:PackageVersion="$ver" \
+            -o /tmp/nupkg
+          if [ -z "${NUGET_API_KEY:-}" ]; then
+            echo "NUGET_API_KEY not set — skipping push (packages in /tmp/nupkg)."
+            ls -la /tmp/nupkg
+            exit 0
+          fi
+          dotnet nuget push /tmp/nupkg/*.nupkg \
+            --api-key "$NUGET_API_KEY" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+
+      - uses: astral-sh/setup-uv@v5
+      - name: Publish to PyPI
+        env:
+          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        working-directory: python
+        run: |
+          set -euo pipefail
+          uv build
+          if [ -z "${PYPI_API_TOKEN:-}" ]; then
+            echo "PYPI_API_TOKEN not set — skipping upload (see python/dist/)."
+            ls -la dist/
+            exit 0
+          fi
+          UV_PUBLISH_TOKEN="$PYPI_API_TOKEN" uv publish
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
