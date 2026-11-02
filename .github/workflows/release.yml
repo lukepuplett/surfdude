@@ -1,7 +1,7 @@
 name: Release
 
 # Push a semver tag vX.Y.Z (after scripts/tag-release/bump-version.sh and tests).
-# Add repository secrets: NUGET_API_KEY, PYPI_API_TOKEN (PyPI → Account settings → API tokens).
+# Add repository secret PYPI_API_TOKEN for PyPI (Account settings → API tokens). NuGet is manual/off for now.
 
 on:
   push:
@@ -48,33 +48,11 @@ jobs:
         run: |
           set -euo pipefail
           ver="${GITHUB_REF#refs/tags/}"
-          modtag="go/${ver#v}"
+          modtag="go/${ver}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag "$modtag" "${{ github.sha }}"
           git push origin "$modtag"
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
-      - name: Pack and push NuGet
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-        run: |
-          set -euo pipefail
-          ver="${GITHUB_REF#refs/tags/v}"
-          dotnet pack csharp/Evoq.Surfdude.sln -c Release \
-            -p:Version="$ver" -p:PackageVersion="$ver" \
-            -o /tmp/nupkg
-          if [ -z "${NUGET_API_KEY:-}" ]; then
-            echo "NUGET_API_KEY not set — skipping push (packages in /tmp/nupkg)."
-            ls -la /tmp/nupkg
-            exit 0
-          fi
-          dotnet nuget push /tmp/nupkg/*.nupkg \
-            --api-key "$NUGET_API_KEY" \
-            --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
 
       - uses: astral-sh/setup-uv@v5
       - name: Publish to PyPI
