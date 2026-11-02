@@ -42,7 +42,7 @@ Publishing to nuget.org is scripted in [build/Publish-ToNuGet.ps1](build/Publish
 | [tests/Evoq.Surfdude.Tests/](tests/Evoq.Surfdude.Tests/) | xUnit tests (injectable `HttpClient`, per-wave context) |
 | [tests/Evoq.Surfdude.ConsoleApp/](tests/Evoq.Surfdude.ConsoleApp/) | Apiary-style sample ride |
 
-Shared hypermedia rules, retries, and credentials: [docs/model.md](../docs/model.md). Dialect contract and fixtures: [docs/dialects.md](../docs/dialects.md).
+Shared hypermedia rules, retries, credentials, and **form values (prefills vs URL templates)** are in [docs/model.md](../docs/model.md).
 
 ## Using the client
 
@@ -65,6 +65,27 @@ await surfer.Wave()
 
 Surfdude does **not** retry inside the library. For production, attach Polly or `Microsoft.Extensions.Http.Resilience` to the `HttpClient` you pass in. See [Driving a real server](../README.md#driving-a-real-server) in the root README.
 
+Dialect contract and fixtures: [docs/dialects.md](../docs/dialects.md).
+
+## Form values on the C# client today
+
+Surfdude merges **prefilled input values** from hypermedia with whatever you pass to `ThenSubmit`. The C# **simple** formatter currently reads each form entry's **name** and **isOptional** only, not **`value`**. Until that is wired up, pass every field your API expects in the transfer object. Go and Python already apply **`value`** for the **agenttrader** dialect; see [Form values in the model](../docs/model.md#form-values-for-api-writers-and-for-journeys).
+
 ## Sample JSON
 
-The **simple** dialect expects documents like [fixtures/simple/root.json](../fixtures/simple/root.json): top-level `links` (optional `form` on each link) and `items` for list members.
+The **simple** dialect expects documents like [fixtures/simple/root.json](../fixtures/simple/root.json): top-level `links` (optional `form` on each link) and `items` for list members. Example with a template and optional query inputs:
+
+```json
+{
+  "links": [{
+    "rel": "registration-finder",
+    "href": "https://example.test/registrations/{status}",
+    "form": [
+      {"name": "status", "options": ["active", "inactive", "any"]},
+      {"name": "email"}
+    ]
+  }]
+}
+```
+
+The journey supplies `status` and `email`; the client expands `{status}` in the URL. To prefill `status` server-side, add `"value": "active"` on that form entry (once the simple dialect reads it).

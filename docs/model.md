@@ -35,9 +35,69 @@ Something to follow or submit, found by its **rel** (its relation name). A rel i
 
 ## Input
 
-One field of a form: a **name**, whether it is **required**, a suggested **value** (sent unless overridden, like an HTML value attribute), and a **schema**, a JSON Schema fragment. The client checks `type`, `enum`, `minimum`, `maximum`, `minLength`, `maxLength` and `pattern` before it sends anything, and says what is wrong.
+One field of a form: a **name**, whether it is **required**, an optional **value**, and a **schema** (a JSON Schema fragment). The client checks `type`, `enum`, `minimum`, `maximum`, `minLength`, `maxLength` and `pattern` before it sends anything, and says what is wrong.
 
 A dotted name such as `location.lat` becomes a nested object in a JSON body.
+
+## Form values: for API writers and for journeys
+
+Surfdude never scrapes a URL to discover hidden form defaults. Anything the server wants sent without the client guessing must appear on the **control** in hypermedia. The client merges that with whatever the journey supplies, then builds one HTTP request.
+
+### If you design the API
+
+Think in three places, not one:
+
+| You put it on… | Use it for… | Example |
+|----------------|-------------|---------|
+| **`href` / `action` (fixed part)** | Where the request goes. Resource identity the server already chose. | `/shortlist`, `/registrations/7/contact` |
+| **`href` / `action` (URI template)** | Named slots that become path or query when the form is submitted. | `/registrations/{status}` with `{?skip,take}` |
+| **Each input's `value` on the control** | Field defaults the server already knows: hidden ids, current step, item context. Like HTML `value` or a pre-checked box. | `"listingId": "lst_seed01"` on the shortlist action for that listing |
+| **Each input's `schema` (e.g. `enum`)** | What values are allowed, not which one is selected. | `"options": ["active", "inactive"]` on the simple dialect |
+
+Rules that keep journeys small and safe:
+
+- Put **context that changes per page or per list item** on that item's controls (each search hit carries its own `listingId` in `fields[].value`, not a single global form).
+- Mark a field **required** only when the client must supply it and the server did not set `value`. If you set `value`, the client can submit with an empty map for the other fields.
+- Use **URI templates** when a value belongs in the path or query by REST habit; use **JSON body fields** (AgentTrader `_actions` / POST) for the rest. The client fills templates first, then sends leftover names in the body or query according to the method.
+- Do not rely on the client parsing **query strings on the link** as form state. If it is not in `inputs` / `fields` or in a `{template}` name, Surfdude will not treat it as a field.
+
+How each shipped dialect spells a prefilled field:
+
+| Dialect | Where the API puts a default field value | Notes |
+|---------|------------------------------------------|--------|
+| **agenttrader** | `"value"` on each object in `_actions[].fields` | Go and Python read this into the model. See [fixtures/agenttrader/listings-search.json](../fixtures/agenttrader/listings-search.json). |
+| **simple** | `"value"` on each object in `links[].form[]` | In the neutral model, but **not yet read** by the Go, Python, or C# simple parsers today. Use agenttrader-shaped controls or pass values from the journey until simple gains `value`. |
+| **C# simple client** | Same JSON shape as above when supported | Today only **name** and **isOptional** are read; journey code must pass every field in `ThenSubmit` until the formatter maps `value`. |
+
+### If you write the journey (client code)
+
+When you `Submit(rel, values)` or `ThenSubmit(rel, values)`:
+
+1. The client loads the control for `rel` on the current page or selected item.
+2. It **merges**: start from each input's **value** on the control (when the dialect set one), then apply your map. **Your keys win** on the same name.
+3. It rejects unknown names, missing required fields, and schema violations **before** HTTP.
+4. It builds the URL from **href** plus template expansion, then puts remaining merged keys in the query (GET, HEAD, DELETE) or body (POST, PUT, …).
+
+So you usually pass **only what the user or test changed**—for example `note` on shortlist—while `listingId` rides along from the hypermedia on that item's `shortlist` action.
+
+```go
+// Search: you supply search criteria. Shortlist: server prefilled listingId on the item's form.
+surf.NewWave(s).FromRoot().
+    Then("search-listings", surf.With(surf.Values{"make": "MINI"})).
+    ThenItem(1).
+    ThenSubmit("shortlist", surf.Values{"note": "nice"}).
+    Go(ctx)
+```
+
+```python
+s.wave().from_root().then(
+    "search-listings", values={"make": "MINI"}
+).then_item(1).then_submit("shortlist", {"note": "nice"}).go()
+```
+
+If you pass nothing (`Submit(rel, nil)` / empty map), the request still sends every **value** the server attached to inputs, as long as required fields are satisfied.
+
+**Not the same as prefill:** `schema.enum` / simple `options` only constrain what you may send; they do not pick a default. **Selected** means an input **value** on the control, or an explicit entry in your submit map.
 
 ## Journeys
 

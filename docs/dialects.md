@@ -23,6 +23,16 @@ A client holds a list of dialects and tries them in order. If none matches, the 
 
 Go and Python ship both dialects and run `/fixtures` conformance tests. The C# client ships **simple** only today; add a formatter implementation and the same fixture files when you port **agenttrader**.
 
+### Field defaults and URI templates (API authors)
+
+When you add a fixture case or design a real API, spell defaults explicitly:
+
+- **AgentTrader:** `"fields": [{"name": "listingId", "required": true, "value": "lst_01"}, …]` on `_actions`.
+- **Simple:** `"form": [{"name": "skip", "isOptional": true, "value": "0"}, …]` on `links` is the intended shape; confirm your client dialect reads `value` before you depend on it (see [model.md — Form values](model.md#form-values-for-api-writers-and-for-journeys)).
+- **Templates:** put `{variable}` or `{?a,b,c}` in `href` / `action` for values that belong in the URL; list those names in the fixture if they are not also in `form` / `fields`.
+
+Clients merge prefilled **values** with journey input, expand templates, then send the rest in the body or query. They do not infer hidden fields from a fully built URL string.
+
 ## Fixtures
 
 `/fixtures/<dialect>/cases.json` lists response files, their headers, and what the model must hold after reading them. Every implementation runs the same files, so two clients are held to one definition. Add a case when you find a response a dialect gets wrong.

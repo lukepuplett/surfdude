@@ -11,7 +11,7 @@ examples/    journeys against a running AgentTrader
 internal/conformance/   checks a dialect against /fixtures
 ```
 
-Module path `github.com/lukepuplett/surfdude/go`. It matches the repository once that is renamed from `surfdude-csharp` to `surfdude`. Until then use a `go.work` or a `replace`. The C# client lives in [../csharp/README.md](../csharp/README.md).
+Module path `github.com/lukepuplett/surfdude/go`. It matches the repository once that is renamed from `surfdude-csharp` to `surfdude`. Until then use a `go.work` or a `replace`. [Form values and prefills](../docs/model.md#form-values-for-api-writers-and-for-journeys) · [C# client](../csharp/README.md)
 
 ## Try it on a running server
 
