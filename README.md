@@ -8,7 +8,7 @@ A hypermedia client that **drives an API the way a person drives a website**: st
 
 | Folder | What |
 |--------|------|
-| [csharp/](csharp/) | The original client, with its `simple-hypertext+json` dialect. [Jump to its README](#c) |
+| [csharp/](csharp/) | The original client (**simple** dialect). **.NET 8** / **.NET 10** — [csharp/README.md](csharp/README.md) |
 | [go/](go/) | The Go client: same journey verbs, pluggable **dialects** (the examples use **agenttrader**; C# below uses **simple**). Explorer and CLI in [go/](go/) |
 | [python/](python/) | Python client: same fixtures and model; **uv** + **pytest** — see [python/README.md](python/README.md) for toolchain |
 | [docs/](docs/) | [model.md](docs/model.md): the language-neutral model and the journey verbs. [dialects.md](docs/dialects.md): how a server's spelling is read |
@@ -128,6 +128,7 @@ The Go client is new (November 2026): two dialects, an explorer, a command-line 
 - **Teach the C# client the AgentTrader envelope.** It already has the seam (`IHypertextResourceFormatter`); the shared [fixtures](fixtures/) say what a correct reading looks like.
 - **A small dialect for x402 `402` bodies,** which are not the AgentTrader envelope.
 - **More dialects:** HAL, Siren, and HTML (`a` is a link, `form` is a form).
+- **CI for C#** — `dotnet test` on [csharp/tests/Evoq.Surfdude.Tests](csharp/tests/Evoq.Surfdude.Tests); see [csharp/README.md](csharp/README.md).
 - **CI for Go** and a first tag, `go/v0.1.0`.
 - **CI for Python** (`uv run pytest` in `python/`) on the same fixtures.
 - **The C# model** is thinner than the Go one: inputs have a name and an optional flag, with no schema. It can grow to match [docs/model.md](docs/model.md).
@@ -136,6 +137,8 @@ The Go client is new (November 2026): two dialects, an explorer, a command-line 
 
 <a id="c"></a>
 # C# (the original README)
+
+Build, test, target frameworks, and the `Surfer` API are documented in [csharp/README.md](csharp/README.md). The rest of this section is the original product description.
 
 A simple little hypermedia client that dynamically drives a REST API. You can use this to test that an API is genuinely RESTful, i.e. it can be driven entirely by links and hypertext transfer, or you can use this in your application to work a backend API instead of a static URL template based client like Refit.
 

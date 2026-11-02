@@ -56,7 +56,7 @@ Built test first in each language. The opt-in retry rules are in [docs/model.md]
 Changes a maintainer should know about:
 
 - `Evoq.Surfdude.SimpleJson` now has a `ProjectReference` to `Evoq.Surfdude`. It used to reference the published `Surfdude` 1.0.0 package, so it was built against an old copy of its own base library and could not see any change made here. Packing now makes the SimpleJson package depend on the matching `Surfdude` version.
-- The C# libraries target **net8.0** and **net10.0**; the console app and tests target **net10.0**. Run `dotnet test csharp/Evoq.Surfdude.sln`.
+- The C# libraries target **net8.0** and **net10.0**; the console app and tests target **net10.0**. See [csharp/README.md](../csharp/README.md); run `dotnet test csharp/tests/Evoq.Surfdude.Tests`.
 
 ## Still open (not covered by the tests above)
 

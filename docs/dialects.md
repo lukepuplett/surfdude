@@ -21,6 +21,8 @@ A client holds a list of dialects and tries them in order. If none matches, the 
 | `simple` | Surfdude's own `application/simple-hypertext+json`: `links` with an optional `form`, and `items` | The content type |
 | `agenttrader` | The AgentTrader envelope: `status`, `data[]`, `paging`, `_links`, `_actions`, with controls and notes on each item | A `Link: <https://agenttrader.net/profiles/envelope/v1>; rel="profile"` header, or failing that its shape |
 
+Go and Python ship both dialects and run `/fixtures` conformance tests. The C# client ships **simple** only today; add a formatter implementation and the same fixture files when you port **agenttrader**.
+
 ## Fixtures
 
 `/fixtures/<dialect>/cases.json` lists response files, their headers, and what the model must hold after reading them. Every implementation runs the same files, so two clients are held to one definition. Add a case when you find a response a dialect gets wrong.

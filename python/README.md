@@ -1,6 +1,6 @@
 # Surfdude for Python
 
-Hypermedia client: drive an API by `rel` names, not URLs. Same neutral model and shared [fixtures](../fixtures/) as Go and C#.
+Hypermedia client: drive an API by `rel` names, not URLs. Same neutral model and shared [fixtures](../fixtures/) as Go and C#. See [csharp/README.md](../csharp/README.md) for the .NET client.
 
 ## Toolchain (if you are new to Python here)
 
