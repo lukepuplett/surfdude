@@ -87,6 +87,12 @@ func checkSchema(schema hypertext.Schema, val any) string {
 		}
 	}
 
+	if format, ok := schema["format"].(string); ok {
+		if reason := checkFormat(format, val); reason != "" {
+			return reason
+		}
+	}
+
 	if enum, ok := schema["enum"].([]any); ok && len(enum) > 0 {
 		found := false
 		for _, e := range enum {
@@ -124,6 +130,22 @@ func checkSchema(schema hypertext.Schema, val any) string {
 		}
 	}
 
+	return ""
+}
+
+var emailFormat = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
+
+func checkFormat(format string, val any) string {
+	if format != "email" {
+		return ""
+	}
+	s, ok := val.(string)
+	if !ok {
+		return "must be a valid email address"
+	}
+	if !emailFormat.MatchString(s) {
+		return "must be a valid email address"
+	}
 	return ""
 }
 

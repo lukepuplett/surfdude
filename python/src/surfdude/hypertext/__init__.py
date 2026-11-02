@@ -1,6 +1,7 @@
 from surfdude.hypertext.errors import (
     InvalidInputError,
     MissingInputError,
+    MultiItemReadError,
     NoDataError,
     RelNotFoundError,
     UnexpectedInputError,
@@ -15,6 +16,7 @@ __all__ = [
     "InvalidInputError",
     "Item",
     "MissingInputError",
+    "MultiItemReadError",
     "NoDataError",
     "Paging",
     "Price",

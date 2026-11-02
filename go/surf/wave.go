@@ -49,9 +49,24 @@ type Report struct {
 func NewWave(s *Surfer) *Wave { return &Wave{s: s} }
 
 // FromRoot opens the front door.
-func (w *Wave) FromRoot() *Wave {
-	return w.add("from root", func(ctx context.Context, st *waveState) error {
-		p, err := w.s.Root(ctx)
+func (w *Wave) FromRoot() *Wave { return w.From("") }
+
+// From opens a URL as the first page. An empty string opens the surfer's front door.
+func (w *Wave) From(url string) *Wave {
+	label := "from root"
+	if url != "" {
+		label = "from " + url
+	}
+	return w.add(label, func(ctx context.Context, st *waveState) error {
+		var (
+			p   *Page
+			err error
+		)
+		if url == "" {
+			p, err = w.s.Root(ctx)
+		} else {
+			p, err = w.s.Open(ctx, url)
+		}
 		st.page, st.item = p, nil
 		return err
 	})

@@ -56,6 +56,11 @@ def check_schema(schema: dict[str, Any], val: Any) -> str:
         reason = _check_type(t, val)
         if reason:
             return reason
+    fmt = schema.get("format")
+    if isinstance(fmt, str):
+        reason = _check_format(fmt, val)
+        if reason:
+            return reason
     enum = schema.get("enum")
     if isinstance(enum, list) and enum and not any(same_value(e, val) for e in enum):
         return f"must be one of {', '.join(str(e) for e in enum)}"
@@ -83,6 +88,17 @@ def check_schema(schema: dict[str, Any], val: Any) -> str:
         pattern = schema.get("pattern")
         if isinstance(pattern, str) and re.fullmatch(pattern, val) is None:
             return f"must match {pattern}"
+    return ""
+
+
+_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _check_format(fmt: str, val: Any) -> str:
+    if fmt != "email":
+        return ""
+    if not isinstance(val, str) or not _EMAIL.fullmatch(val):
+        return "must be a valid email address"
     return ""
 
 

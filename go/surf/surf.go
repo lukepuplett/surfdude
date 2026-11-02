@@ -92,6 +92,20 @@ func (s *Surfer) Root(ctx context.Context) (*Page, error) {
 	return s.do(req, "open the front door", nil)
 }
 
+// Open fetches an absolute URL or a path relative to the front door.
+func (s *Surfer) Open(ctx context.Context, raw string) (*Page, error) {
+	u, err := s.root.Parse(raw)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to open %q. It is not a valid URL: %w", raw, err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	s.decorate(req)
+	return s.do(req, fmt.Sprintf("open %q", raw), nil)
+}
+
 func (s *Surfer) decorate(req *http.Request) {
 	if accept := s.reg.Accept(); accept != "" {
 		req.Header.Set("Accept", accept)
@@ -192,7 +206,20 @@ func (p *Page) Control(rel string) (hypertext.Control, bool) { return p.Resource
 func (p *Page) Notes() []string { return p.Resource.Notes }
 
 // Read decodes the first item's data into a value.
-func (p *Page) Read(into any) error { return p.Resource.Decode(into) }
+func (p *Page) Read(into any) error {
+	if len(p.Resource.Items) > 1 {
+		return &hypertext.MultiItemReadError{Count: len(p.Resource.Items)}
+	}
+	return p.Resource.Decode(into)
+}
+
+// RawBody is the full response body bytes, for formatter-style decode.
+func (p *Page) RawBody() []byte {
+	if p.Resource == nil {
+		return nil
+	}
+	return p.Resource.Body
+}
 
 // Follow takes the control with the given rel, sending any values it needs.
 func (p *Page) Follow(ctx context.Context, rel string, opts ...Step) (*Page, error) {
@@ -256,6 +283,10 @@ func (p *Page) take(ctx context.Context, controls []hypertext.Control, where, re
 			offered[i] = cc.Rel
 		}
 		return nil, &hypertext.RelNotFoundError{Rel: rel, Where: where, Offered: offered}
+	}
+
+	if err := preflight(c, p.s.token); err != nil {
+		return nil, err
 	}
 
 	cfg := config(opts)

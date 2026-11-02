@@ -10,6 +10,7 @@ package hypertext
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
 )
 
@@ -133,8 +134,29 @@ func (r *Resource) Control(rel string) (Control, bool) { return find(r.Controls,
 // Rels lists the rels the resource offers.
 func (r *Resource) Rels() []string { return rels(r.Controls) }
 
+// DuplicateRels lists rel names that appear on more than one control.
+func (r *Resource) DuplicateRels() []string {
+	counts := map[string]int{}
+	for _, c := range r.Controls {
+		if c.Rel != "" {
+			counts[c.Rel]++
+		}
+	}
+	var out []string
+	for rel, n := range counts {
+		if n > 1 {
+			out = append(out, rel)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 // Decode reads the first item's JSON into a value, which is the common case of a single resource.
 func (r *Resource) Decode(into any) error {
+	if len(r.Problems) > 0 {
+		return &NoDataError{}
+	}
 	if len(r.Items) == 0 {
 		return &NoDataError{}
 	}

@@ -1,7 +1,6 @@
-"""Red repro tests for behaviour gaps (see ../tmp/gap-tracking.md).
+"""Regression tests for behaviour gaps that were found by review and then fixed.
 
-Run: uv run pytest -m gap
-Default pytest excludes these (addopts -m 'not gap').
+Each test is named after its entry in ../tmp/gap-tracking.md.
 """
 
 from __future__ import annotations
@@ -14,8 +13,12 @@ import pytest
 
 from surfdude import AgentTraderDialect, Surfer
 from surfdude.hypertext import InvalidInputError, NoDataError
-
-pytestmark = pytest.mark.gap
+from surfdude.hypertext.errors import MultiItemReadError
+from surfdude.surf.preflight import (
+    NonHypermediaControlError,
+    PaymentRequiredError,
+    RequiresNotMetError,
+)
 
 PROFILE = '<https://agenttrader.net/profiles/envelope/v1>; rel="profile"'
 
@@ -56,7 +59,7 @@ def test_gap01_requires_preflight_before_http() -> None:
     client = httpx.Client(transport=httpx.MockTransport(handler), base_url="http://test")
     surfer = Surfer.new("http://test/", AgentTraderDialect(), client=client)
     home = surfer.root()
-    with pytest.raises(Exception) as exc:
+    with pytest.raises(RequiresNotMetError) as exc:
         home.follow("secret")
     assert "agent-session" in str(exc.value).lower()
     assert secret_hits == 0
@@ -90,7 +93,7 @@ def test_gap02_price_preflight_before_post() -> None:
 
     client = httpx.Client(transport=httpx.MockTransport(handler), base_url="http://test")
     surfer = Surfer.new("http://test/", AgentTraderDialect(), client=client)
-    with pytest.raises(Exception) as exc:
+    with pytest.raises(PaymentRequiredError) as exc:
         surfer.root().submit("buy", {"sku": "x"})
     assert "pay" in str(exc.value).lower()
     assert post_hits == 0
@@ -119,7 +122,7 @@ def test_gap03_non_hypermedia_type_preflight() -> None:
 
     client = httpx.Client(transport=httpx.MockTransport(handler), base_url="http://test")
     surfer = Surfer.new("http://test/", AgentTraderDialect(), client=client)
-    with pytest.raises(Exception):
+    with pytest.raises(NonHypermediaControlError):
         surfer.root().follow("human-page")
     assert html_hits == 0
 
@@ -130,7 +133,7 @@ def test_gap04_read_on_list_page_must_select_item(gap_listings_server: httpx.Cli
     results = home.submit("search-listings", {"make": "MINI"})
     assert len(results.resource.items) >= 2
     target: dict[str, Any] = {}
-    with pytest.raises(Exception) as exc:
+    with pytest.raises(MultiItemReadError) as exc:
         results.read(target)
     assert "item" in str(exc.value).lower()
 
@@ -144,30 +147,26 @@ def test_gap05_read_after_422_should_not_decode_as_business_dto(gap_listings_ser
         page.read(business)
 
 
-def test_gap06_wave_from_arbitrary_url() -> None:
-    wave = Surfer.new("http://test/", AgentTraderDialect()).wave()
-    assert hasattr(wave, "from_url"), "Wave needs from_url() like C# From(uri)"
+def test_gap06_wave_from_arbitrary_url(gap_listings_server: httpx.Client) -> None:
+    surfer = Surfer.new("http://test/", AgentTraderDialect(), client=gap_listings_server)
+    report = surfer.wave().from_url("/listings").then_item(0).go()
+    assert report.lines[0].url.endswith("/listings")
+    assert report.lines[0].status == 200
+    assert len(report.lines) == 2
 
 
 def test_gap07_page_exposes_raw_response_body(gap_listings_server: httpx.Client) -> None:
     surfer = Surfer.new("http://test/", AgentTraderDialect(), client=gap_listings_server)
     home = surfer.root()
-    assert home.resource.body
-    assert hasattr(home, "raw_body"), "Page needs raw_body() for formatter-style decode"
+    envelope = json.loads(home.raw_body())
+    assert envelope["status"] == 200
+    assert envelope["_actions"][0]["rel"] == "search-listings"
 
 
 def test_gap08_wave_expect_422(gap_listings_server: httpx.Client) -> None:
     surfer = Surfer.new("http://test/", AgentTraderDialect(), client=gap_listings_server)
-    wave = surfer.wave().from_root()
-    if not hasattr(wave, "then_submit"):
-        pytest.fail("missing wave API")
-    # Ideal: then_submit(..., expect=422) and go() returns without raising
-    submit = getattr(wave, "then_submit")
-    import inspect
-
-    if "expect" not in inspect.signature(submit).parameters:
-        pytest.fail("Wave.then_submit has no expect=; cannot treat 422 as success in a chain")
-    surfer.wave().from_root().then_submit("create-listing", {"reg": ""}, expect=422).go()
+    report = surfer.wave().from_root().then_submit("create-listing", {"reg": ""}, expect=422).go()
+    assert [line.status for line in report.lines] == [200, 422]
 
 
 def test_gap09_schema_format_validated() -> None:
@@ -279,3 +278,29 @@ def gap_listings_server() -> httpx.Client:
         return _json(404, {"status": 404, "message": "not found", "data": []})
 
     return httpx.Client(transport=httpx.MockTransport(handler), base_url="http://test")
+
+
+def test_preflight_runs_before_input_validation() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _json(
+            200,
+            {
+                "status": 200,
+                "message": "OK",
+                "data": [],
+                "_actions": [
+                    {
+                        "rel": "shortlist",
+                        "action": "/shortlist",
+                        "method": "POST",
+                        "requires": ["agent-session"],
+                        "fields": [{"name": "listingId", "required": True}],
+                    }
+                ],
+            },
+        )
+
+    client = httpx.Client(transport=httpx.MockTransport(handler), base_url="http://test")
+    surfer = Surfer.new("http://test/", AgentTraderDialect(), client=client)
+    with pytest.raises(RequiresNotMetError):
+        surfer.root().submit("shortlist", {})

@@ -12,11 +12,13 @@ from surfdude.hypertext import (
     Control,
     InvalidInputError,
     MissingInputError,
+    MultiItemReadError,
     RelNotFoundError,
     Resource,
     UnexpectedInputError,
     UnexpectedStatusError,
 )
+from surfdude.surf.preflight import preflight
 from surfdude.surf.request import build_request, response_from_httpx
 from surfdude.surf.values import Values, merge
 
@@ -72,7 +74,14 @@ class Page:
 
     def read(self, into: Any) -> None:
         assert self.resource
+        if len(self.resource.items) > 1:
+            raise MultiItemReadError(len(self.resource.items))
         self.resource.decode(into)
+
+    def raw_body(self) -> bytes:
+        if self.resource is None:
+            return b""
+        return self.resource.body
 
     def _take(
         self,
@@ -86,6 +95,7 @@ class Page:
         if control is None:
             offered = [c.rel for c in controls]
             raise RelNotFoundError(rel=rel, where=where, offered=offered)
+        preflight(control, self.surfer.token)
         vals, err = _safe_merge(control, values)
         if err:
             raise err
@@ -175,6 +185,11 @@ class Surfer:
     def root(self) -> Page:
         req = httpx.Request("GET", self.root_url, headers=self._base_headers())
         return self._do(req, "open the front door", None)
+
+    def open(self, url: str) -> Page:
+        resolved = httpx.URL(self.root_url).join(url)
+        req = httpx.Request("GET", str(resolved), headers=self._base_headers())
+        return self._do(req, f"open {url!r}", None)
 
     def _base_headers(self) -> dict[str, str]:
         h = {"User-Agent": self.agent}

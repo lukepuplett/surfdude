@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -8,6 +9,14 @@ from surfdude.surf.values import Values
 
 if TYPE_CHECKING:
     from surfdude.surf.surfer import ItemPage, Page, Surfer
+
+
+def _expect_fn(expect: int | Callable[[int], bool] | None) -> Callable[[int], bool] | None:
+    if expect is None:
+        return None
+    if isinstance(expect, int):
+        return lambda code: code == expect
+    return expect
 
 
 @dataclass
@@ -29,17 +38,39 @@ class Wave:
     _steps: list[tuple[str, Any]] = field(default_factory=list)
 
     def from_root(self) -> Wave:
+        return self.from_url("")
+
+    def from_url(self, url: str) -> Wave:
+        label = "from root" if not url else f"from {url}"
+
         def run(state: _WaveState) -> None:
-            state.page = self.surfer.root()
+            if url:
+                state.page = self.surfer.open(url)
+            else:
+                state.page = self.surfer.root()
             state.item = None
 
-        return self._add("from root", run)
+        return self._add(label, run)
 
-    def then(self, rel: str, *, values: Values | None = None) -> Wave:
-        return self._add(f"then {rel}", lambda st: st.move(rel, values))
+    def then(
+        self,
+        rel: str,
+        *,
+        values: Values | None = None,
+        expect: int | Callable[[int], bool] | None = None,
+    ) -> Wave:
+        exp = _expect_fn(expect)
+        return self._add(f"then {rel}", lambda st: st.move(rel, values, exp))
 
-    def then_submit(self, rel: str, values: Values) -> Wave:
-        return self._add(f"then submit {rel}", lambda st: st.move(rel, dict(values)))
+    def then_submit(
+        self,
+        rel: str,
+        values: Values,
+        *,
+        expect: int | Callable[[int], bool] | None = None,
+    ) -> Wave:
+        exp = _expect_fn(expect)
+        return self._add(f"then submit {rel}", lambda st: st.move(rel, dict(values), exp))
 
     def then_item(self, index: int) -> Wave:
         def run(state: _WaveState) -> None:
@@ -85,17 +116,22 @@ class _WaveState:
     page: Page | None = None
     item: ItemPage | None = None
 
-    def move(self, rel: str, values: Values | None) -> None:
+    def move(
+        self,
+        rel: str,
+        values: Values | None,
+        expect: Callable[[int], bool] | None,
+    ) -> None:
         if self.item is not None:
             if values is not None:
-                self.page = self.item.submit(rel, values)
+                self.page = self.item.submit(rel, values, expect=expect)
             else:
-                self.page = self.item.follow(rel, values=values)
+                self.page = self.item.follow(rel, values=values, expect=expect)
         elif self.page is not None:
             if values is not None:
-                self.page = self.page.submit(rel, values)
+                self.page = self.page.submit(rel, values, expect=expect)
             else:
-                self.page = self.page.follow(rel, values=values)
+                self.page = self.page.follow(rel, values=values, expect=expect)
         else:
             raise RuntimeError("The wave has no page yet.")
         self.item = None

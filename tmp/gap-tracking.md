@@ -1,41 +1,50 @@
 # Surfdude behaviour gaps — tracking
 
-Red repro tests live behind **`go test -tags=gap ./surf/...`** (from `go/`) and **`uv run pytest -m gap`** (from `python/`). They should **fail** until the ideal behaviour is implemented. Do not enable in CI until green.
-
-## Run
+All ten gaps found in review are now fixed in both the Go and Python clients. The repro tests that
+proved each gap are now ordinary regression tests and run with the default suites:
 
 ```sh
-cd go && go test -tags=gap ./surf/...
-cd python && uv run pytest -m gap
+cd go && go test ./...
+cd python && uv run pytest
 ```
 
-Normal CI-style runs exclude gap tests: `go test ./surf/...` and `uv run pytest` (Python uses `addopts = "-m 'not gap'"`).
-
-**Expected today (2026-11-02):** Go gap — **9 fail**, **1 pass** (`TestGAP08_WaveExpect422`). Python gap — **10 fail**.
-
-| ID | Gap | Ideal (short) | Go test | Python test |
-|----|-----|---------------|---------|-------------|
-| GAP-01 | `Requires` on journeys | Refuse before HTTP with needs agent-session | `TestGAP01_RequiresPreflightBeforeHTTP` | `test_gap01_requires_preflight_before_http` |
-| GAP-02 | `Price` on controls | Refuse before POST with payment required | `TestGAP02_PricePreflightBeforePOST` | `test_gap02_price_preflight_before_post` |
-| GAP-03 | `Control.Type` non-hypermedia | Refuse Follow on non-JSON/hypermedia type | `TestGAP03_NonHypermediaTypePreflight` | `test_gap03_non_hypermedia_type_preflight` |
-| GAP-04 | `Page.Read` with many items | Error unless explicitly reading first item | `TestGAP04_ReadOnListPageMustSelectItem` | `test_gap04_read_on_list_page_must_select_item` |
-| GAP-05 | Read vs problems on 422 | Do not treat problem payloads as business DTO | `TestGAP05_ReadAfter422ShouldNotDecodeAsBusinessDTO` | `test_gap05_read_after_422_should_not_decode_as_business_dto` |
-| GAP-06 | Wave `From(url)` | Start wave at bookmark URL, not only root | `TestGAP06_WaveFromArbitraryURL` | `test_gap06_wave_from_arbitrary_url` |
-| GAP-07 | Raw body on page | Expose envelope/body for formatter-style decode | `TestGAP07_PageExposesRawResponseBody` | `test_gap07_page_exposes_raw_response_body` |
-| GAP-08 | Wave + `Expect(422)` | Chain step expects refusal; page has problems | `TestGAP08_WaveExpect422` **passes today** | `test_gap08_wave_expect_422` **fails** (no `expect` on wave) |
-| GAP-09 | JSON Schema `format` | Reject invalid format before send | `TestGAP09_SchemaFormatValidated` | `test_gap09_schema_format_validated` |
-| GAP-10 | Duplicate `rel` on one page | Warn or error when dialect reads duplicates | `TestGAP10_DuplicateRelReported` | `test_gap10_duplicate_rel_reported` |
-
-## Not covered as automated reds (manual / C# / infra)
-
-- C# shared `/fixtures` conformance
-- Cookie session (only Bearer today)
-- Redirect strict mode
-- Auto `SetBearer` after sign-in response
-- x402 payment flow (covered in spirit by GAP-02)
-
-## Scenario notes
-
-See chat 2026-11-02 — each GAP maps to scenario / might happen / ideally sections there.
-
 Last updated: 2026-11-02
+
+## Fixed
+
+| ID | Gap | What now happens | Go | Python |
+|----|-----|------------------|----|--------|
+| GAP-01 | `Requires` on journeys | A control that needs `agent-session` is refused before any HTTP request when the surfer holds no token. The error names the requirement. | `surf/preflight.go`, `RequiresNotMetError` | `surf/preflight.py`, `RequiresNotMetError` |
+| GAP-02 | `Price` on controls | A control that carries a price is refused before the request is sent, and the error says payment is required. | `PaymentRequiredError` | `PaymentRequiredError` |
+| GAP-03 | `Control.Type` non-hypermedia | A control whose type is not JSON is refused before the request is sent. | `NonHypermediaControlError` | `NonHypermediaControlError` |
+| GAP-04 | `Page.Read` on a list | Reading a page that has several items fails and tells the caller to select one with `Item(i)`. | `MultiItemReadError` | `MultiItemReadError` |
+| GAP-05 | Read after a refusal | When a resource carries problems (for example a 422), `Read` returns `NoDataError` instead of decoding problem rows as business data. | `Resource.Decode` | `Resource.decode` |
+| GAP-06 | Wave from an arbitrary URL | A wave can start at a bookmarked path or URL. | `Wave.From`, `Surfer.Open` | `Wave.from_url`, `Surfer.open` |
+| GAP-07 | Raw body on a page | The whole response body is available for decoding outside the neutral model. | `Page.RawBody` | `Page.raw_body` |
+| GAP-08 | Wave with an expected status | A wave step can expect a refusal such as 422 and carry on. Go already supported this through `surf.Expect`. | already supported | `then(..., expect=)`, `then_submit(..., expect=)` |
+| GAP-09 | JSON Schema `format` | A value that does not match `format: email` is rejected before sending. Other formats are not yet checked. | `checkFormat` in `surf/values.go` | `_check_format` in `surf/values.py` |
+| GAP-10 | Duplicate `rel` | A resource can report which rels appear on more than one control. This is reporting only; it does not yet change which control wins. | `Resource.DuplicateRels` | `Resource.duplicate_rels` |
+
+## Behaviour to know about
+
+- Preflight runs first, before the input values are validated and before any request is built, so a
+  caller without a session is told about the session rather than about a missing field. `Requires`
+  is satisfied only by the surfer holding a bearer token; it does not yet check what the requirement
+  is called.
+- Any control with a price is refused. There is no payment flow yet, so a paid control can never be
+  submitted until an x402 dialect and wallet step exist.
+- `format` validation covers `email` only. Unknown formats are ignored rather than rejected, which
+  matches the JSON Schema rule that unknown formats are annotations.
+- A duplicate rel is reported but not rejected. The first control with that rel still wins.
+
+## Still open (not covered by the tests above)
+
+- C# does not run the shared `/fixtures` conformance cases.
+- Cookie sessions: only `Authorization: Bearer` is modelled.
+- Redirect policy is unspecified, with no strict mode.
+- Nothing sets the bearer token automatically after a sign-in response.
+- The x402 payment flow itself.
+- Python still lacks Explore, a command-line tool, `surftest`-style helpers and live AgentTrader
+  journeys.
+- Go and Python preflight do not yet apply to Explore's own skip rules, which are a separate copy of
+  the same checks in `surf/explore.go`.

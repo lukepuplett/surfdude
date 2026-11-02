@@ -93,3 +93,11 @@ class UnexpectedStatusError(Exception):
 class NoDataError(Exception):
     def __str__(self) -> str:
         return "Unable to read data. The response carried none."
+
+
+class MultiItemReadError(Exception):
+    def __init__(self, count: int) -> None:
+        self.count = count
+        super().__init__(
+            f"Unable to read data. This page has {count} items; select one with Item(i)."
+        )

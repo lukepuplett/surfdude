@@ -1,7 +1,5 @@
-//go:build gap
-
-// Red repro tests for behaviour gaps (see ../../tmp/gap-tracking.md).
-// Run: go test -tags=gap ./go/surf/...
+// Regression tests for behaviour gaps that were found by review and then fixed. Each test is named
+// after its entry in ../../tmp/gap-tracking.md.
 package surf_test
 
 import (
@@ -43,7 +41,7 @@ func gapHomeWithPaidAction() map[string]any {
 		"_actions": []any{
 			map[string]any{
 				"rel": "buy", "action": "/paid", "method": "POST", "enctype": "application/json",
-				"price": map[string]any{"amount": "1", "currency": "USD", "note": "listing fee"},
+				"price":  map[string]any{"amount": "1", "currency": "USD", "note": "listing fee"},
 				"fields": []any{map[string]any{"name": "sku", "required": true, "schema": map[string]any{"type": "string"}}},
 			},
 		},
@@ -214,9 +212,15 @@ func TestGAP05_ReadAfter422ShouldNotDecodeAsBusinessDTO(t *testing.T) {
 func TestGAP06_WaveFromArbitraryURL(t *testing.T) {
 	srv := newServer(t)
 	s := surfer(t, srv)
-	w := surf.NewWave(s)
-	if _, ok := any(w).(interface{ From(string) *surf.Wave }); !ok {
-		t.Fatal("Wave has no From(url); want bookmark entry like C#")
+	report, err := surf.NewWave(s).
+		From("/listings").
+		ThenItem(0).
+		Go(context.Background())
+	if err != nil {
+		t.Fatalf("a wave should start from a bookmarked path: %v", err)
+	}
+	if len(report.Lines) != 2 || report.Lines[0].Status != 200 || !strings.HasSuffix(report.Lines[0].URL, "/listings") {
+		t.Fatalf("report = %+v, want the first step to open /listings with a 200", report.Lines)
 	}
 }
 
@@ -224,11 +228,17 @@ func TestGAP06_WaveFromArbitraryURL(t *testing.T) {
 func TestGAP07_PageExposesRawResponseBody(t *testing.T) {
 	srv := newServer(t)
 	home := surftest.Root(t, surfer(t, srv))
-	if home.Resource == nil || len(home.Resource.Body) == 0 {
-		t.Fatal("resource should carry body")
+	var envelope struct {
+		Status  int `json:"status"`
+		Actions []struct {
+			Rel string `json:"rel"`
+		} `json:"_actions"`
 	}
-	if _, ok := any(home).(interface{ RawBody() []byte }); !ok {
-		t.Fatal("Page has no RawBody(); want public access to response bytes")
+	if err := json.Unmarshal(home.RawBody(), &envelope); err != nil {
+		t.Fatalf("RawBody should be the whole JSON envelope: %v", err)
+	}
+	if envelope.Status != 200 || len(envelope.Actions) == 0 || envelope.Actions[0].Rel != "search-listings" {
+		t.Fatalf("envelope = %+v, want status 200 and the search-listings action", envelope)
 	}
 }
 
@@ -279,15 +289,36 @@ func TestGAP10_DuplicateRelReported(t *testing.T) {
 	if home.Resource == nil {
 		t.Fatal("need resource")
 	}
-	// Ideal: home.Resource.DuplicateRels() returns ["self"] when two controls share a rel.
-	type duplicateReporter interface {
-		DuplicateRels() []string
-	}
-	rep, ok := any(home.Resource).(duplicateReporter)
-	if !ok {
-		t.Fatal("Resource has no DuplicateRels(); want duplicate rel reporting")
-	}
-	if len(rep.DuplicateRels()) == 0 {
+	if len(home.Resource.DuplicateRels()) == 0 {
 		t.Fatal("want DuplicateRels to report duplicate rel names on the page")
+	}
+}
+
+// A control that needs a session and also has a missing required field must report the session
+// first, because that is the blocker the caller can act on.
+func TestPreflightRunsBeforeInputValidation(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeGapJSON(w, 200, map[string]any{
+			"status": 200, "message": "OK", "data": []any{},
+			"_actions": []any{
+				map[string]any{
+					"rel": "shortlist", "action": "/shortlist", "method": "POST",
+					"requires": []string{"agent-session"},
+					"fields":   []any{map[string]any{"name": "listingId", "required": true}},
+				},
+			},
+		})
+	}))
+	t.Cleanup(srv.Close)
+
+	s, _ := surf.New(srv.URL, surf.WithDialects(agenttrader.New()))
+	home, err := s.Root(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = home.Submit(context.Background(), "shortlist", surf.Values{})
+	var needs *hypertext.RequiresNotMetError
+	if !errors.As(err, &needs) {
+		t.Fatalf("err = %v, want RequiresNotMetError before the missing-field error", err)
 	}
 }

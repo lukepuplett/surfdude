@@ -96,7 +96,18 @@ class Resource:
     def rels(self) -> list[str]:
         return [c.rel for c in self.controls]
 
+    def duplicate_rels(self) -> list[str]:
+        counts: dict[str, int] = {}
+        for c in self.controls:
+            if c.rel:
+                counts[c.rel] = counts.get(c.rel, 0) + 1
+        return sorted(rel for rel, n in counts.items() if n > 1)
+
     def decode(self, into: Any) -> None:
+        if self.problems:
+            from surfdude.hypertext.errors import NoDataError
+
+            raise NoDataError()
         if not self.items:
             from surfdude.hypertext.errors import NoDataError
 
