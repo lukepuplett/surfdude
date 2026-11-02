@@ -42,7 +42,7 @@ Publishing to nuget.org is scripted in [build/Publish-ToNuGet.ps1](build/Publish
 | [tests/Evoq.Surfdude.Tests/](tests/Evoq.Surfdude.Tests/) | xUnit tests (injectable `HttpClient`, per-wave context) |
 | [tests/Evoq.Surfdude.ConsoleApp/](tests/Evoq.Surfdude.ConsoleApp/) | Apiary-style sample ride |
 
-Shared hypermedia rules, retries, credentials, and **form values (prefills vs URL templates)** are in [docs/model.md](../docs/model.md).
+Shared hypermedia rules, retries, credentials, prefilled **value**, and [stateless multi-step journals](../docs/model.md#stateless-journeys-journal-on-the-wire): [docs/model.md](../docs/model.md).
 
 ## Using the client
 

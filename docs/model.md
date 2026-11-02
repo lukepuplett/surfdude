@@ -99,6 +99,64 @@ If you pass nothing (`Submit(rel, nil)` / empty map), the request still sends ev
 
 **Not the same as prefill:** `schema.enum` / simple `options` only constrain what you may send; they do not pick a default. **Selected** means an input **value** on the control, or an explicit entry in your submit map.
 
+## Stateless journeys: journal on the wire
+
+Many multi-step APIs are described as a **journal** or **wizard**: step one collects an email, step two confirms a listing, step three pays. Surfdude fits a **stateless hypermedia** reading of that pattern. The server does not rely on a hidden server-side form that only exists because the client remembered to call “step 2”; each response carries the **next** controls, and earlier steps show up as **prefilled inputs**, fixed or templated URLs, and **per-item** actions—not as a parallel journal the client must maintain.
+
+### The idea
+
+| Layer | Who holds it | What it looks like |
+|-------|----------------|-------------------|
+| **Story so far** | The **server**, re-published on every response | `value` on fields, `href`/`action`, `If-Match`, optional draft **tokens** in `value` |
+| **What the user or test changed this step** | The **journey** (wave) | The map you pass to `Submit` / `ThenSubmit` |
+| **Where you are in a list** | The **current page + item** | `ThenItem(i)` so the next step uses **that member’s** controls |
+
+Previous steps do not “call forward” into server memory that the client cannot see. They **prepopulate later form values** (and sometimes the link target) on the hypermedia you get **after** each successful step. That is the **builder** pattern in hypermedia terms: the wave is a fluent sequence of rels; the **server is the builder** that writes the accumulated context back into the next representation.
+
+This is **stateless at the contract**:
+
+- Each submit can be built from **one control** plus merge (prefill + your values) plus headers the control declares (`If-Match`, bearer for `requires`).
+- The client never names URLs or methods; it never parses an old URL for hidden fields.
+
+It is **not** “the server has no database.” A draft id or session token in **`value`** is explicit. The client stays dumb; the server may still store state behind that token.
+
+### What API authors should do
+
+1. **Publish the journal on the wire.** After each step, return controls whose **`value`** fields carry ids, tokens, and choices from earlier steps. Use **item-level** `_actions` / links so “shortlist this car” includes **`listingId`** on that item’s form ([listings-search.json](../fixtures/agenttrader/listings-search.json)), not a single global form that assumes the server remembers which row the user picked.
+
+2. **Only ask the client for what is new.** Required inputs without **`value`** are what the journey must supply. Everything else can arrive prefilled ([prefilled-form.json](../fixtures/simple/prefilled-form.json): `sessionToken` in `value`, client sends `title`).
+
+3. **Put routing in `href`, not in client memory.** Fixed paths and URI templates (`{status}`, `{?skip,take}`) belong on the control. Do not document “call `/step/3` after step 2” outside the hypermedia.
+
+4. **Use problems and the same rel on refusal.** A 422 with problems and a **`create-listing`** control again lets the journey retry with corrected **values** while the server keeps prefills on the refreshed form.
+
+5. **Avoid invisible continuation.** If a step only works because the server stored “wizard state” with no token or field on the control, Surfdude cannot drive it reliably—and neither can a good hypermedia client.
+
+### How Surfdude supports it
+
+| Mechanism | Role in a stateless journal |
+|-----------|------------------------------|
+| **Wave / `Go`** | Ordered steps by **rel**; failure reports how far the journal got. |
+| **`ThenItem`** | Switches to one list member’s controls so the next submit uses **that row’s** prefilled ids. |
+| **Merge (prefill + submit map)** | Server **`value`** first, caller overrides; required checks use “required and no prefill.” Go/Python in `merge`; C# in `BuildRequest` via `MergeSendPairs`. |
+| **`Follow` with empty values** | Sends a GET (or POST with only prefills) when the control needs nothing new from the caller. |
+| **`If-Match` / `requires`** | Version and auth declared on the control, not invented by the client. |
+| **Fixtures / conformance** | Shared examples of prefilled fields and item actions so all implementations merge the same way. |
+
+A minimal journal-shaped ride (search → pick item → submit only the new field):
+
+```go
+surf.NewWave(s).FromRoot().
+    ThenSubmit("search-listings", surf.Values{"make": "MINI"}).
+    ThenItem(0).
+    ThenSubmit("shortlist", surf.Values{"note": "nice"}).
+    Go(ctx)
+```
+
+The server prefilled **`listingId`** on item 0’s **`shortlist`** action; the journey only adds **`note`**. No client-side journal map is required.
+
+Design detail for **values vs URL templates** and dialect spelling: [Form values](#form-values-for-api-writers-and-for-journeys) above.
+
 ## Journeys
 
 | Verb | What it does |

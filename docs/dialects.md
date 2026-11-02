@@ -33,6 +33,8 @@ When you add a fixture case or design a real API, spell defaults explicitly:
 
 Clients merge prefilled **values** with journey input, expand templates, then send the rest in the body or query. They do not infer hidden fields from a fully built URL string.
 
+Multi-step **journals** (wizards, onboarding) should put accumulated context into **`value`** and item-level controls on each response so journeys stay small—design notes in [model.md — Stateless journeys](model.md#stateless-journeys-journal-on-the-wire).
+
 ## Fixtures
 
 `/fixtures/<dialect>/cases.json` lists response files, their headers, and what the model must hold after reading them. Every implementation runs the same files, so two clients are held to one definition. Add a case when you find a response a dialect gets wrong.

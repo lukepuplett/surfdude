@@ -11,7 +11,7 @@ A hypermedia client that **drives an API the way a person drives a website**: st
 | [csharp/](csharp/) | The original client (**simple** dialect). **.NET 8** / **.NET 10** — [csharp/README.md](csharp/README.md) |
 | [go/](go/) | The Go client: same journey verbs, pluggable **dialects** (the examples use **agenttrader**; C# below uses **simple**). Explorer and CLI in [go/](go/) |
 | [python/](python/) | Python client: same fixtures and model; **uv** + **pytest** — see [python/README.md](python/README.md) for toolchain |
-| [docs/](docs/) | [model.md](docs/model.md): the language-neutral model, journey verbs, and [form values / prefills](docs/model.md#form-values-for-api-writers-and-for-journeys). [dialects.md](docs/dialects.md): how a server's spelling is read |
+| [docs/](docs/) | [model.md](docs/model.md): neutral model, [form values](docs/model.md#form-values-for-api-writers-and-for-journeys), [stateless multi-step journals](docs/model.md#stateless-journeys-journal-on-the-wire). [dialects.md](docs/dialects.md): dialect spelling |
 | [fixtures/](fixtures/) | Responses and expectations that every implementation must agree on |
 | [scripts/](scripts/) | `journey-agenttrader.sh` starts a local AgentTrader and drives it |
 | [tmp/gap-tracking.md](tmp/gap-tracking.md) | Behaviour gaps found in review, what fixed each one, and what is still open |
@@ -62,7 +62,7 @@ cd go && go run ./cmd/surf show http://localhost:8080   # prints which dialect r
 cd go && go run ./cmd/surf explore http://localhost:8080   # crawl everything reachable
 ```
 
-Design an API by writing the journey first. The errors tell you what to add to the hypertext until the journey runs. Put field defaults on each control's inputs in hypermedia (not only in the URL); see [docs/model.md — Form values](docs/model.md#form-values-for-api-writers-and-for-journeys). In tests, step-by-step helpers live in [go/surftest/](go/surftest/); see [go/README.md](go/README.md).
+Design an API by writing the journey first. The errors tell you what to add to the hypertext until the journey runs. Multi-step flows work best when each response **prepopulates** the next forms (`value` on inputs, controls on list items)—see [Stateless journeys: journal on the wire](docs/model.md#stateless-journeys-journal-on-the-wire). Field mechanics: [Form values](docs/model.md#form-values-for-api-writers-and-for-journeys). In tests, step-by-step helpers live in [go/surftest/](go/surftest/); see [go/README.md](go/README.md).
 
 ## Python sample ride
 
