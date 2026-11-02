@@ -63,6 +63,25 @@ cd go && go run ./cmd/surf explore http://localhost:8080   # crawl everything re
 
 Design an API by writing the journey first. The errors tell you what to add to the hypertext until the journey runs. In tests, step-by-step helpers live in [go/surftest/](go/surftest/); see [go/README.md](go/README.md).
 
+## Python sample ride
+
+Same journey and **agenttrader** dialect as Go, with a fluent **wave** (`go()` runs the chain). Install and test with [uv](https://docs.astral.sh/uv/) — see [python/README.md](python/README.md).
+
+```python
+from surfdude import AgentTraderDialect, Surfer
+
+with Surfer.new("http://localhost:8080", AgentTraderDialect()) as s:
+    s.wave().from_root().then_submit(
+        "search-listings", {"make": "MINI"}
+    ).then_item(0).then_submit(
+        "shortlist", {"note": "nice colour"}
+    ).go()
+```
+
+```sh
+cd python && uv sync --all-groups && uv run pytest   # same /fixtures cases as Go
+```
+
 ## Status and what is next
 
 The Go client is new (November 2026): two dialects, an explorer, a command-line tool and first journeys against AgentTrader. The C# client is the original and has not changed beyond moving into `csharp/`.
@@ -72,6 +91,7 @@ The Go client is new (November 2026): two dialects, an explorer, a command-line 
 - **A small dialect for x402 `402` bodies,** which are not the AgentTrader envelope.
 - **More dialects:** HAL, Siren, and HTML (`a` is a link, `form` is a form).
 - **CI for Go** and a first tag, `go/v0.1.0`.
+- **CI for Python** (`uv run pytest` in `python/`) on the same fixtures.
 - **The C# model** is thinner than the Go one: inputs have a name and an optional flag, with no schema. It can grow to match [docs/model.md](docs/model.md).
 
 ---
