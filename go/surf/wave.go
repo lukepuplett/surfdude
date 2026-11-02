@@ -37,6 +37,7 @@ type ReportLine struct {
 	Step     string
 	URL      string
 	Status   int
+	Attempts int
 	Duration time.Duration
 }
 
@@ -126,7 +127,8 @@ func (st *waveState) move(ctx context.Context, rel string, v Values, opts []Step
 	default:
 		next, err = st.page.Follow(ctx, rel, opts...)
 	}
-	if next != nil && err == nil {
+	if next != nil {
+		// Keep a failing response too, so the report shows its status and attempts.
 		st.page, st.item = next, nil
 	}
 	return err
@@ -141,7 +143,7 @@ func (w *Wave) Go(ctx context.Context) (*Report, error) {
 		err := step.run(ctx, st)
 		line := ReportLine{Step: step.name, Duration: time.Since(start)}
 		if st.page != nil {
-			line.URL, line.Status = st.page.URL.String(), st.page.Status
+			line.URL, line.Status, line.Attempts = st.page.URL.String(), st.page.Status, st.page.Attempts
 		}
 		report.Lines = append(report.Lines, line)
 		if err != nil {

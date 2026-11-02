@@ -18,6 +18,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/lukepuplett/surfdude/go/dialect"
@@ -29,11 +30,15 @@ const maxBody = 4 << 20
 // Surfer holds what every step shares: the client, the front door, the dialects it understands and
 // an optional bearer token.
 type Surfer struct {
-	client *http.Client
-	root   *url.URL
-	reg    *dialect.Registry
-	token  string
-	agent  string
+	client  *http.Client
+	root    *url.URL
+	reg     *dialect.Registry
+	mu      sync.RWMutex // guards token, which SetBearer may change while requests are in flight
+	token   string
+	agent   string
+	retry   RetryPolicy
+	sleep   func(context.Context, time.Duration) error
+	timeout time.Duration
 }
 
 // Option configures a Surfer.
@@ -50,6 +55,19 @@ func WithDialects(ds ...dialect.Dialect) Option {
 // WithBearer sets the access token sent as Authorization: Bearer.
 func WithBearer(token string) Option { return func(s *Surfer) { s.token = token } }
 
+// WithRetry sets the retry policy for every step. Without it nothing is retried. A step can override
+// it with Retrying.
+func WithRetry(p RetryPolicy) Option { return func(s *Surfer) { s.retry = p } }
+
+// WithSleep replaces how a surfer waits between attempts. Tests use it to avoid real delays.
+func WithSleep(f func(context.Context, time.Duration) error) Option {
+	return func(s *Surfer) { s.sleep = f }
+}
+
+// WithTimeout sets the timeout of the default HTTP client, 30 seconds without it. It has no effect when
+// WithHTTPClient supplies a client, because that client carries its own timeout.
+func WithTimeout(d time.Duration) Option { return func(s *Surfer) { s.timeout = d } }
+
 // New builds a Surfer for a front door URL.
 func New(root string, opts ...Option) (*Surfer, error) {
 	u, err := url.Parse(root)
@@ -57,9 +75,12 @@ func New(root string, opts ...Option) (*Surfer, error) {
 		return nil, fmt.Errorf("Unable to start. %q is not an absolute URL.", root)
 	}
 
-	s := &Surfer{client: &http.Client{Timeout: 30 * time.Second}, root: u, agent: "surfdude-go"}
+	s := &Surfer{root: u, agent: "surfdude-go", timeout: 30 * time.Second, sleep: sleepContext}
 	for _, o := range opts {
 		o(s)
+	}
+	if s.client == nil {
+		s.client = &http.Client{Timeout: s.timeout}
 	}
 	if s.reg == nil || len(s.reg.Names()) == 0 {
 		return nil, fmt.Errorf("Unable to start. A Surfer needs at least one dialect: use surf.WithDialects.")
@@ -69,7 +90,18 @@ func New(root string, opts ...Option) (*Surfer, error) {
 }
 
 // SetBearer changes the access token, for example after signing in.
-func (s *Surfer) SetBearer(token string) { s.token = token }
+func (s *Surfer) SetBearer(token string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.token = token
+}
+
+// bearer returns the current access token.
+func (s *Surfer) bearer() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.token
+}
 
 // Page is where the journey has got to: a response read into the neutral model.
 type Page struct {
@@ -79,6 +111,8 @@ type Page struct {
 	Header   http.Header
 	Dialect  string
 	Resource *hypertext.Resource
+	// Attempts is how many times the request was sent. It is 1 unless a retry policy tried again.
+	Attempts int
 }
 
 // Root fetches the front door.
@@ -89,7 +123,7 @@ func (s *Surfer) Root(ctx context.Context) (*Page, error) {
 	}
 	s.decorate(req)
 
-	return s.do(req, "open the front door", nil)
+	return s.do(req, "open the front door", nil, nil)
 }
 
 // Open fetches an absolute URL or a path relative to the front door.
@@ -103,43 +137,102 @@ func (s *Surfer) Open(ctx context.Context, raw string) (*Page, error) {
 		return nil, err
 	}
 	s.decorate(req)
-	return s.do(req, fmt.Sprintf("open %q", raw), nil)
+	return s.do(req, fmt.Sprintf("open %q", raw), nil, nil)
 }
 
 func (s *Surfer) decorate(req *http.Request) {
 	if accept := s.reg.Accept(); accept != "" {
 		req.Header.Set("Accept", accept)
 	}
-	if s.token != "" {
-		req.Header.Set("Authorization", "Bearer "+s.token)
+	if token := s.bearer(); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	req.Header.Set("User-Agent", s.agent)
 }
 
-// do sends a request and reads the response. expected is nil for "any 2xx".
-func (s *Surfer) do(req *http.Request, step string, expected func(int) bool) (*Page, error) {
-	if expected == nil {
-		expected = func(code int) bool { return code >= 200 && code < 300 }
-	}
-	req.Header.Set("User-Agent", s.agent)
+// exchange is one attempt: the response, its body, and what went wrong if anything did.
+type exchange struct {
+	resp    *http.Response
+	body    []byte
+	err     error
+	reading bool // the error came while reading the body, not while sending
+}
 
+func (s *Surfer) exchange(req *http.Request) exchange {
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to %s. The request failed: %w", step, err)
+		return exchange{err: err}
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))
 	if err != nil {
-		return nil, fmt.Errorf("Unable to %s. The response could not be read: %w", step, err)
+		return exchange{resp: resp, err: err, reading: true}
+	}
+	return exchange{resp: resp, body: body}
+}
+
+// do sends a request and reads the response, trying again when the retry policy says to. expected is
+// nil for "any 2xx". A status the step expects is never retried, so a journey that tests a refusal
+// sees it once. policy is nil to use the surfer's.
+func (s *Surfer) do(req *http.Request, step string, expected func(int) bool, policy RetryPolicy) (*Page, error) {
+	if expected == nil {
+		expected = func(code int) bool { return code >= 200 && code < 300 }
+	}
+	if policy == nil {
+		policy = s.retry
+	}
+	if policy == nil {
+		policy = Never()
+	}
+	req.Header.Set("User-Agent", s.agent)
+
+	for attempt := 1; ; attempt++ {
+		ex := s.exchange(req)
+
+		failed := ex.err != nil || !expected(ex.resp.StatusCode)
+		if failed && req.Context().Err() == nil && replayable(req) {
+			a := RetryAttempt{Number: attempt, Method: req.Method, Err: ex.err, Idempotent: idempotent(req)}
+			if ex.resp != nil {
+				a.Status, a.Header = ex.resp.StatusCode, ex.resp.Header
+			}
+			if wait, again := policy.Next(a); again {
+				if err := s.sleep(req.Context(), wait); err != nil {
+					return nil, fmt.Errorf("Unable to %s. Waiting to try again was interrupted: %w", step, err)
+				}
+				next, err := rewind(req)
+				if err != nil {
+					return nil, fmt.Errorf("Unable to %s. The request body could not be rebuilt to try again: %w", step, err)
+				}
+				req = next
+				continue
+			}
+		}
+
+		return s.finish(req, step, expected, ex, attempt)
+	}
+}
+
+// finish turns the last attempt into a Page, or an error.
+func (s *Surfer) finish(req *http.Request, step string, expected func(int) bool, ex exchange, attempts int) (*Page, error) {
+	tried := ""
+	if attempts > 1 {
+		tried = fmt.Sprintf(" after %d attempts", attempts)
+	}
+	switch {
+	case ex.err != nil && ex.reading:
+		return nil, fmt.Errorf("Unable to %s. The response could not be read%s: %w", step, tried, ex.err)
+	case ex.err != nil:
+		return nil, fmt.Errorf("Unable to %s. The request failed%s: %w", step, tried, ex.err)
 	}
 
-	page := &Page{s: s, URL: req.URL, Status: resp.StatusCode, Header: resp.Header}
+	resp, body := ex.resp, ex.body
+	page := &Page{s: s, URL: req.URL, Status: resp.StatusCode, Header: resp.Header, Attempts: attempts}
 
 	d, ok := s.reg.Choose(resp, body)
 	if !ok {
 		if !expected(resp.StatusCode) {
-			return page, &hypertext.UnexpectedStatusError{Step: step, Status: resp.StatusCode}
+			return page, &hypertext.UnexpectedStatusError{Step: step, Status: resp.StatusCode, Attempts: attempts}
 		}
 		return page, s.reg.Unsupported(resp)
 	}
@@ -152,7 +245,7 @@ func (s *Surfer) do(req *http.Request, step string, expected func(int) bool) (*P
 	page.Resource = res
 
 	if !expected(resp.StatusCode) {
-		return page, &hypertext.UnexpectedStatusError{Step: step, Status: resp.StatusCode, Message: res.Message, Resource: res}
+		return page, &hypertext.UnexpectedStatusError{Step: step, Status: resp.StatusCode, Message: res.Message, Resource: res, Attempts: attempts}
 	}
 
 	return page, nil
@@ -160,12 +253,22 @@ func (s *Surfer) do(req *http.Request, step string, expected func(int) bool) (*P
 
 // Step options.
 type stepConfig struct {
-	values Values
-	expect func(int) bool
+	values         Values
+	expect         func(int) bool
+	retry          RetryPolicy
+	idempotencyKey bool
 }
 
 // Step changes how one step is taken.
 type Step func(*stepConfig)
+
+// Retrying sets the retry policy for this step, replacing the surfer's. Retrying(surf.Never()) turns
+// retries off for the step.
+func Retrying(p RetryPolicy) Step { return func(c *stepConfig) { c.retry = p } }
+
+// WithIdempotencyKey sends a fresh Idempotency-Key header, the same on every attempt of the step. It
+// lets a retry policy repeat a POST, provided the server honours the key.
+func WithIdempotencyKey() Step { return func(c *stepConfig) { c.idempotencyKey = true } }
 
 // With gives the values to send to a form.
 func With(v Values) Step { return func(c *stepConfig) { c.values = v } }
@@ -285,7 +388,7 @@ func (p *Page) take(ctx context.Context, controls []hypertext.Control, where, re
 		return nil, &hypertext.RelNotFoundError{Rel: rel, Where: where, Offered: offered}
 	}
 
-	if err := preflight(c, p.s.token); err != nil {
+	if err := preflight(c, p.s.bearer()); err != nil {
 		return nil, err
 	}
 
@@ -295,10 +398,18 @@ func (p *Page) take(ctx context.Context, controls []hypertext.Control, where, re
 		return nil, err
 	}
 
-	req, err := buildRequest(ctx, p.s.reg, p.URL, c, vals, p.s.token)
+	req, err := buildRequest(ctx, p.s.reg, p.URL, c, vals, p.s.bearer())
 	if err != nil {
 		return nil, err
 	}
 
-	return p.s.do(req, fmt.Sprintf("follow %q", rel), cfg.expect)
+	if cfg.idempotencyKey {
+		key, err := newIdempotencyKey()
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Idempotency-Key", key)
+	}
+
+	return p.s.do(req, fmt.Sprintf("follow %q", rel), cfg.expect, cfg.retry)
 }

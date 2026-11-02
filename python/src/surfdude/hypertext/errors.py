@@ -78,6 +78,9 @@ class UnexpectedStatusError(Exception):
     status: int
     message: str = ""
     resource: Resource | None = None
+    attempts: int = 1
+    """How many times the request was sent. More than 1 only when a retry policy tried again."""
+    url: str = ""
 
     def __str__(self) -> str:
         text = f"Unable to {self.step}. The server answered {self.status}"
@@ -86,7 +89,23 @@ class UnexpectedStatusError(Exception):
         if self.resource and self.resource.problems:
             ps = [f"{p.field} {p.message}".strip() for p in self.resource.problems]
             text += f" ({'; '.join(ps)})"
-        return text + "."
+        text += "."
+        if self.attempts > 1:
+            text += f" It was tried {self.attempts} times."
+        return text
+
+
+@dataclass
+class RequestFailedError(Exception):
+    """The request never got an answer, for example the connection failed or timed out."""
+
+    step: str
+    cause: Exception
+    attempts: int = 1
+
+    def __str__(self) -> str:
+        tried = f" after {self.attempts} attempts" if self.attempts > 1 else ""
+        return f"Unable to {self.step}. The request failed{tried}: {self.cause}"
 
 
 @dataclass

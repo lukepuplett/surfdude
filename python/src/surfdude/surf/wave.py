@@ -5,6 +5,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from surfdude.hypertext import RequestFailedError, UnexpectedStatusError
+from surfdude.surf.retry import RetryPolicy
 from surfdude.surf.values import Values
 
 if TYPE_CHECKING:
@@ -24,12 +26,21 @@ class ReportLine:
     step: str
     url: str = ""
     status: int = 0
+    attempts: int = 0
     duration: float = 0.0
 
 
 @dataclass
 class Report:
     lines: list[ReportLine] = field(default_factory=list)
+
+
+class WaveStoppedError(RuntimeError):
+    """A step failed. The report shows how far the wave got, including the failing step."""
+
+    def __init__(self, message: str, report: Report) -> None:
+        super().__init__(message)
+        self.report = report
 
 
 @dataclass
@@ -58,9 +69,13 @@ class Wave:
         *,
         values: Values | None = None,
         expect: int | Callable[[int], bool] | None = None,
+        retry: RetryPolicy | None = None,
+        idempotency_key: bool = False,
     ) -> Wave:
         exp = _expect_fn(expect)
-        return self._add(f"then {rel}", lambda st: st.move(rel, values, exp))
+        return self._add(
+            f"then {rel}", lambda st: st.move(rel, values, exp, retry, idempotency_key)
+        )
 
     def then_submit(
         self,
@@ -68,9 +83,14 @@ class Wave:
         values: Values,
         *,
         expect: int | Callable[[int], bool] | None = None,
+        retry: RetryPolicy | None = None,
+        idempotency_key: bool = False,
     ) -> Wave:
         exp = _expect_fn(expect)
-        return self._add(f"then submit {rel}", lambda st: st.move(rel, dict(values), exp))
+        return self._add(
+            f"then submit {rel}",
+            lambda st: st.move(rel, dict(values), exp, retry, idempotency_key),
+        )
 
     def then_item(self, index: int) -> Wave:
         def run(state: _WaveState) -> None:
@@ -104,8 +124,9 @@ class Wave:
                 run(state)
             except Exception as exc:
                 line = _line(name, state, time.monotonic() - start)
+                _describe_failure(line, exc)
                 report.lines.append(line)
-                raise RuntimeError(f'The wave stopped at "{name}": {exc}') from exc
+                raise WaveStoppedError(f'The wave stopped at "{name}": {exc}', report) from exc
             report.lines.append(_line(name, state, time.monotonic() - start))
         return report
 
@@ -121,17 +142,24 @@ class _WaveState:
         rel: str,
         values: Values | None,
         expect: Callable[[int], bool] | None,
+        retry: RetryPolicy | None = None,
+        idempotency_key: bool = False,
     ) -> None:
+        options: dict[str, Any] = {
+            "expect": expect,
+            "retry": retry,
+            "idempotency_key": idempotency_key,
+        }
         if self.item is not None:
             if values is not None:
-                self.page = self.item.submit(rel, values, expect=expect)
+                self.page = self.item.submit(rel, values, **options)
             else:
-                self.page = self.item.follow(rel, values=values, expect=expect)
+                self.page = self.item.follow(rel, **options)
         elif self.page is not None:
             if values is not None:
-                self.page = self.page.submit(rel, values, expect=expect)
+                self.page = self.page.submit(rel, values, **options)
             else:
-                self.page = self.page.follow(rel, values=values, expect=expect)
+                self.page = self.page.follow(rel, **options)
         else:
             raise RuntimeError("The wave has no page yet.")
         self.item = None
@@ -142,4 +170,15 @@ def _line(name: str, state: _WaveState, duration: float) -> ReportLine:
     if state.page is not None:
         line.url = state.page.url
         line.status = state.page.status
+        line.attempts = state.page.attempts
     return line
+
+
+def _describe_failure(line: ReportLine, exc: Exception) -> None:
+    """Show the failing response on the report, not the page the wave was on before it."""
+    if isinstance(exc, UnexpectedStatusError):
+        line.url = exc.url or line.url
+        line.status = exc.status
+        line.attempts = exc.attempts
+    elif isinstance(exc, RequestFailedError):
+        line.attempts = exc.attempts

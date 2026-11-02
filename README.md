@@ -83,9 +83,46 @@ with Surfer.new("http://localhost:8080", AgentTraderDialect()) as s:
 cd python && uv sync --all-groups && uv run pytest   # same /fixtures cases as Go
 ```
 
+## Driving a real server
+
+By default a surfer retries nothing, so a test sees every failure. A client of a real server can opt in to retries. A retry never repeats a status the step expects, and repeats a POST only when the step carries an idempotency key. The rules are in [docs/model.md](docs/model.md#retries-timeouts-and-credentials).
+
+```go
+s, _ := surf.New(root, surf.WithDialects(agenttrader.New()),
+    surf.WithRetry(surf.StandardRetry()), surf.WithTimeout(10*time.Second))
+
+surf.NewWave(s).FromRoot().
+    ThenSubmit("shortlist", surf.Values{"note": "nice colour"}, surf.WithIdempotencyKey()).
+    Go(ctx)
+```
+
+```python
+from surfdude import AgentTraderDialect, StandardRetry, Surfer
+
+with Surfer.new(root, AgentTraderDialect(), retry=StandardRetry(), timeout=10.0) as s:
+    s.wave().from_root().then_submit(
+        "shortlist", {"note": "nice colour"}, idempotency_key=True
+    ).go()
+```
+
+C# keeps one long-lived `Surfer`, so the `HttpClient` is shared rather than created for every wave. Retries, timeouts and authentication go in that client's handler pipeline, which is where .NET already puts them. What belongs to one journey is set on that wave and never leaks into the next.
+
+```csharp
+// Once, for example as a singleton in dependency injection.
+var surfer = Surfer.For("https://api.example.com/")
+    .WithHttpClient(httpClientWithRetryHandler)
+    .WithLoggerFactory(loggerFactory);
+
+// Per journey.
+await surfer.Wave(c => c.ExpectedStatusCodes = new[] { 200, 404 })
+    .FromRoot().Then("find-listing").GoAsync();
+```
+
+`Surf.Wave(rootUri)` still works as before, and now shares one default `HttpClient` instead of creating one per wave.
+
 ## Status and what is next
 
-The Go client is new (November 2026): two dialects, an explorer, a command-line tool and first journeys against AgentTrader. The C# client is the original and has not changed beyond moving into `csharp/`.
+The Go client is new (November 2026): two dialects, an explorer, a command-line tool and first journeys against AgentTrader. The C# client is the original. It now has a reusable `Surfer` and its first unit tests in [csharp/tests/Evoq.Surfdude.Tests](csharp/tests/Evoq.Surfdude.Tests).
 
 - **Rename this repository** from `surfdude-csharp` to `surfdude`. The Go module path (`github.com/lukepuplett/surfdude/go`) already assumes it. Until then, use a `go.work` or a `replace`.
 - **Teach the C# client the AgentTrader envelope.** It already has the seam (`IHypertextResourceFormatter`); the shared [fixtures](fixtures/) say what a correct reading looks like.

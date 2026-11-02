@@ -52,6 +52,22 @@ A dotted name such as `location.lat` becomes a nested object in a JSON body.
 
 A journey that cannot take a step fails with what the page did offer: `Unable to follow "new-listing". This page has no control with that rel. It offers: self, health.` Write the journey first, then fix the API until it runs.
 
+## Retries, timeouts and credentials
+
+A surfer is built for two jobs. As a testing tool it should show every failure, so it retries nothing by default. As the client of a real server it may need to ride out a busy moment. The same client serves both, and the difference is a policy the caller opts into.
+
+- Retries are off unless a policy is given, either on the surfer or on one step. A step's own policy replaces the surfer's, and a policy that never retries turns it off for that step.
+- A retry is step-aware. A status the step expects is never retried, so a journey that tests a refusal such as 503 sees it exactly once. Only a failure the step did not expect, or a request that got no answer, is offered to the policy.
+- A policy sees the attempt that failed: its number, the method, the status and headers or the transport error, and whether repeating the request is safe. It answers with how long to wait, or that it gives up.
+- Repeating is safe for GET, HEAD, OPTIONS, PUT and DELETE, and for any request that carries an `Idempotency-Key`. A POST is not repeated unless the step asks for a key, and then only if the server honours that header. The key is generated once per step and is the same on every attempt.
+- The standard preset allows three attempts in all, backs off exponentially from 200 ms to 5 s with jitter, and retries 429, 502, 503, 504 and connection errors. A `Retry-After` is obeyed in place of the backoff, but one longer than the 5 s cap counts as a refusal instead of a wait.
+- The number of attempts is reported on the page and on each line of a wave's report, including the line for the step that failed.
+- In Go, a cancelled context ends a backoff wait at once, and a cancelled request is never retried. Python's client is synchronous, so a wait ends only when the sleep does.
+- The timeout belongs to the HTTP client. Go and Python accept one when they build their own client and otherwise leave the caller's client alone. Go changes the bearer token under a lock, so signing in on one goroutine is safe while others ride.
+- Credentials sit on the surfer, not on each journey. Anything fancier than a bearer token, such as signing or token refresh, belongs in the HTTP client's pipeline.
+
+In C#, the surfer does no retrying of its own, because `HttpClient` already has a place for it. A caller who wants retries gives the surfer a client whose handler pipeline retries, for example with Polly or `Microsoft.Extensions.Http.Resilience`. That also keeps one policy for the whole application.
+
 ## Explorer
 
 Crawls everything reachable from the front door by following links, and forms that can be sent as a GET with nothing required. It proves **reachability**, so a route nothing links to is never visited. It reports dead links, responses no dialect can read, rels a registry does not know, and malformed controls. It never submits a form that changes state, and it skips controls that need a token it does not hold, saying so.

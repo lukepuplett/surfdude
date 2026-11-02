@@ -10,10 +10,25 @@
 
     public class StepFactory // Refactor into IServiceProvider.Get<FromRootStep>()
     {
+        // One client for every wave that is not given its own. An HttpClient is meant to be shared: a new
+        // one per wave leaves a socket in TIME_WAIT for each, which runs out under load.
+        private static readonly Lazy<HttpClient> DefaultHttpClient = new Lazy<HttpClient>(() => new HttpClient());
+
         public StepFactory(SurfContext context, IHypertextResourceFormatter resourceFormatter)
+            : this(context, resourceFormatter, httpClient: null)
+        {
+        }
+
+        /// <summary>
+        /// Creates a factory that sends every request through <paramref name="httpClient"/>, so the caller
+        /// controls the handler pipeline: timeouts, retries, authentication, proxies. A null client means
+        /// the shared default.
+        /// </summary>
+        public StepFactory(SurfContext context, IHypertextResourceFormatter resourceFormatter, HttpClient httpClient)
         {
             this.SurfContext = context ?? throw new ArgumentNullException(nameof(context));
             this.ResourceFormatter = resourceFormatter ?? throw new ArgumentNullException(nameof(resourceFormatter));
+            this.HttpClient = httpClient ?? DefaultHttpClient.Value;
         }
 
         //
@@ -22,7 +37,7 @@
 
         private IHypertextResourceFormatter ResourceFormatter { get; }
 
-        private HttpClient HttpClient { get; } = new HttpClient();
+        internal HttpClient HttpClient { get; }
 
         //
 

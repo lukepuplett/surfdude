@@ -80,6 +80,8 @@ type UnexpectedStatusError struct {
 	Status   int
 	Message  string
 	Resource *Resource
+	// Attempts is how many times the request was sent, when a retry policy tried more than once.
+	Attempts int
 }
 
 func (e *UnexpectedStatusError) Error() string {
@@ -94,7 +96,11 @@ func (e *UnexpectedStatusError) Error() string {
 		}
 		text += " (" + strings.Join(ps, "; ") + ")"
 	}
-	return text + "."
+	text += "."
+	if e.Attempts > 1 {
+		text += fmt.Sprintf(" It was tried %d times.", e.Attempts)
+	}
+	return text
 }
 
 // NoDataError means the resource carried no data to read.

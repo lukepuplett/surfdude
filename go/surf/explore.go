@@ -103,12 +103,12 @@ func (s *Surfer) Explore(ctx context.Context, opts ExploreOptions) (*ExploreRepo
 		}
 		seen[key(target)] = true
 
-		req, err := buildRequest(ctx, s.reg, q.from.URL, q.c, map[string]any{}, s.token)
+		req, err := buildRequest(ctx, s.reg, q.from.URL, q.c, map[string]any{}, s.bearer())
 		if err != nil {
 			report.Findings = append(report.Findings, Finding{"bad-control", q.from.URL.Path, err.Error()})
 			continue
 		}
-		page, err := s.do(req, fmt.Sprintf("follow %q", q.c.Rel), func(int) bool { return true })
+		page, err := s.do(req, fmt.Sprintf("follow %q", q.c.Rel), func(int) bool { return true }, Never())
 		if err != nil {
 			kind := "unreadable"
 			var unsupported *hypertext.UnsupportedMediaTypeError
@@ -142,7 +142,7 @@ func (s *Surfer) skipReason(c hypertext.Control) string {
 	switch {
 	case c.HTTPMethod() != "GET":
 		return "changes state, not followed"
-	case len(c.Requires) > 0 && s.token == "":
+	case len(c.Requires) > 0 && s.bearer() == "":
 		return "needs " + strings.Join(c.Requires, ", ") + " and no token was given"
 	case len(c.RequiredInputs()) > 0:
 		names := make([]string, 0)

@@ -37,8 +37,32 @@ Last updated: 2026-11-02
   matches the JSON Schema rule that unknown formats are annotations.
 - A duplicate rel is reported but not rejected. The first control with that rel still wins.
 
+## Real-client hardening (done 2026-11-02)
+
+Built test first in each language. The opt-in retry rules are in [docs/model.md](../docs/model.md#retries-timeouts-and-credentials).
+
+| Item | Go | Python | C# |
+|------|----|--------|----|
+| Opt-in, step-aware retry policy, with a standard preset | `surf.WithRetry`, `surf.Retrying`, `surf.StandardRetry`, `surf.Never` | `Surfer.new(retry=)`, `retry=` on steps, `StandardRetry`, `never` | Not built in. Put a handler in the `HttpClient`; a test shows a retrying handler works across waves. |
+| POST retried only with an idempotency key | `surf.WithIdempotencyKey` | `idempotency_key=True` | Left to the handler |
+| Attempts on the page and on every report line, including the failing step | `Page.Attempts`, `ReportLine.Attempts` | `Page.attempts`, `ReportLine.attempts` | Not applicable |
+| The failing step shows on the report | Fixed in `Wave.Go` | `WaveStoppedError.report` (before, the report was lost on failure) | Already the case |
+| Transport failure is a clear, wrapped error | Already so | `RequestFailedError` (before, a raw `httpx` error escaped) | Not changed |
+| Configurable timeout | `surf.WithTimeout` | `Surfer.new(timeout=)` | Set on the `HttpClient` the caller gives |
+| Bearer token changed safely while requests run | `RWMutex` in `Surfer` | Not needed, a single attribute write is atomic | Not applicable |
+| Reusable client with a shared `HttpClient` | Already so | Already so | `Surfer.For(...).WithHttpClient(...)`; `StepFactory` now shares one default client |
+| Journey settings do not leak between waves | Already so | Already so | `Surfer.Wave(Action<SurfContext>)` makes a fresh context per wave |
+
+Changes a maintainer should know about:
+
+- `Evoq.Surfdude.SimpleJson` now has a `ProjectReference` to `Evoq.Surfdude`. It used to reference the published `Surfdude` 1.0.0 package, so it was built against an old copy of its own base library and could not see any change made here. Packing now makes the SimpleJson package depend on the matching `Surfdude` version.
+- The C# test project targets `net10.0` and runs with `dotnet test csharp/tests/Evoq.Surfdude.Tests`.
+
 ## Still open (not covered by the tests above)
 
+- Python is synchronous only. An async client (`httpx.AsyncClient`) is a separate piece of work and needs its own retry and sleep seam.
+- The credential hook for anything beyond a bearer token (signing, refresh on 401) is not designed. Today it belongs in the HTTP client's pipeline.
+- C# has no per-step retry or timeout. Both belong in the `HttpClient` pipeline, so one wave cannot opt out of the surfer's policy.
 - C# does not run the shared `/fixtures` conformance cases.
 - Cookie sessions: only `Authorization: Bearer` is modelled.
 - Redirect policy is unspecified, with no strict mode.

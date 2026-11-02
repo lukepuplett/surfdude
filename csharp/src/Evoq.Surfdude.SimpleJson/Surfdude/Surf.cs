@@ -7,9 +7,24 @@
     public sealed class Surf : WaveBuilder
     {
         public Surf(SurfContext journeyContext)
-            : base(journeyContext, new SimpleJsonResourceReaderWriter(journeyContext))
+            : this(journeyContext, httpClient: null)
         {
 
+        }
+
+        /// <summary>
+        /// Starts a journey that sends its requests through <paramref name="httpClient"/>. A null client
+        /// means the shared default.
+        /// </summary>
+        public Surf(SurfContext journeyContext, System.Net.Http.HttpClient httpClient)
+            : base(journeyContext, CreateStepFactory(journeyContext, httpClient))
+        {
+
+        }
+
+        private static StepFactory CreateStepFactory(SurfContext journeyContext, System.Net.Http.HttpClient httpClient)
+        {
+            return new StepFactory(journeyContext, new SimpleJsonResourceReaderWriter(journeyContext), httpClient);
         }
 
         public static IWaveStart Wave(string rootUri)
