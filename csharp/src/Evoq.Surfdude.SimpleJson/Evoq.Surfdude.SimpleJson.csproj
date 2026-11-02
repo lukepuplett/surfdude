@@ -1,8 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <RootNamespace>Evoq</RootNamespace>
+    <LangVersion>latest</LangVersion>
 
     <title>Surfdude for SimpleJson</title>
     <description>Surfdude dynamically drives really RESTful APIs. This package works with APIs that return SimpleJson.</description>

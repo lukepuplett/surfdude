@@ -122,7 +122,7 @@ await surfer.Wave(c => c.ExpectedStatusCodes = new[] { 200, 404 })
 
 ## Status and what is next
 
-The Go client is new (November 2026): two dialects, an explorer, a command-line tool and first journeys against AgentTrader. The C# client is the original. It now has a reusable `Surfer` and its first unit tests in [csharp/tests/Evoq.Surfdude.Tests](csharp/tests/Evoq.Surfdude.Tests).
+The Go client is new (November 2026): two dialects, an explorer, a command-line tool and first journeys against AgentTrader. The C# client is the original. It now has a reusable `Surfer`, its first unit tests in [csharp/tests/Evoq.Surfdude.Tests](csharp/tests/Evoq.Surfdude.Tests), and targets **.NET 8** and **.NET 10** (apps and tests on **.NET 10** LTS).
 
 - **Rename this repository** from `surfdude-csharp` to `surfdude`. The Go module path (`github.com/lukepuplett/surfdude/go`) already assumes it. Until then, use a `go.work` or a `replace`.
 - **Teach the C# client the AgentTrader envelope.** It already has the seam (`IHypertextResourceFormatter`); the shared [fixtures](fixtures/) say what a correct reading looks like.
