@@ -53,6 +53,19 @@ results := surftest.Follow(t, home, "search-listings", surf.With(surf.Values{"ma
 problems := surftest.Refused(t, home, "create-listing", surf.Values{"reg": ""}, 422)
 ```
 
+### When the server refuses a step
+
+A step that gets a status it did not expect returns the page **and** an `*hypertext.UnexpectedStatusError`. The page always carries the status, headers and raw body, even when no dialect can read the response (a default mux 404, a proxy's error page), so it is safe to ask for rels or notes. The error carries the same `Header` and `Body`, so `errors.As` alone is enough to read `Retry-After`:
+
+```go
+_, err := page.Follow(ctx, "make-offer")
+var refused *hypertext.UnexpectedStatusError
+if errors.As(err, &refused) && refused.Status == 429 {
+	wait := refused.Header.Get("Retry-After")
+	_ = wait
+}
+```
+
 See [../docs/model.md](../docs/model.md) and [../docs/dialects.md](../docs/dialects.md).
 
 ## Publishing

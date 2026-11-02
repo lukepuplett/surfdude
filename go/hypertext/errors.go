@@ -2,6 +2,7 @@ package hypertext
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 )
 
@@ -74,12 +75,16 @@ func (e *UnsupportedMediaTypeError) Error() string {
 
 // UnexpectedStatusError means the server answered with a status the step did not expect. Resource is
 // the response read into the model, when a dialect could read it, so a test can look at the
-// problems the server reported.
+// problems the server reported. Header and Body are the response as it arrived, whether or not a
+// dialect could read it, so a test can read Retry-After or WWW-Authenticate, or see the plain-text
+// page a proxy sent, from the error alone.
 type UnexpectedStatusError struct {
 	Step     string
 	Status   int
 	Message  string
 	Resource *Resource
+	Header   http.Header
+	Body     []byte
 	// Attempts is how many times the request was sent, when a retry policy tried more than once.
 	Attempts int
 }

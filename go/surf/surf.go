@@ -227,12 +227,21 @@ func (s *Surfer) finish(req *http.Request, step string, expected func(int) bool,
 	}
 
 	resp, body := ex.resp, ex.body
-	page := &Page{s: s, URL: req.URL, Status: resp.StatusCode, Header: resp.Header, Attempts: attempts}
+	// A page never has a nil Resource. If no dialect can read the response, the page still carries
+	// the status, the headers and the raw body, and asking it for rels, notes or items gives nothing
+	// instead of a panic. A journey that hit a proxy's error page can then say what it saw.
+	page := &Page{s: s, URL: req.URL, Status: resp.StatusCode, Header: resp.Header, Attempts: attempts, Resource: &hypertext.Resource{Body: body}}
+	refused := func(message string, read *hypertext.Resource) error {
+		return &hypertext.UnexpectedStatusError{
+			Step: step, Status: resp.StatusCode, Message: message, Resource: read,
+			Header: resp.Header, Body: body, Attempts: attempts,
+		}
+	}
 
 	d, ok := s.reg.Choose(resp, body)
 	if !ok {
 		if !expected(resp.StatusCode) {
-			return page, &hypertext.UnexpectedStatusError{Step: step, Status: resp.StatusCode, Attempts: attempts}
+			return page, refused("", nil)
 		}
 		return page, s.reg.Unsupported(resp)
 	}
@@ -245,7 +254,7 @@ func (s *Surfer) finish(req *http.Request, step string, expected func(int) bool,
 	page.Resource = res
 
 	if !expected(resp.StatusCode) {
-		return page, &hypertext.UnexpectedStatusError{Step: step, Status: resp.StatusCode, Message: res.Message, Resource: res, Attempts: attempts}
+		return page, refused(res.Message, res)
 	}
 
 	return page, nil
