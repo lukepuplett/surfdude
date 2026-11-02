@@ -61,6 +61,26 @@ Changes a maintainer should know about:
 - `Evoq.Surfdude.SimpleJson` now has a `ProjectReference` to `Evoq.Surfdude`. It used to reference the published `Surfdude` 1.0.0 package, so it was built against an old copy of its own base library and could not see any change made here. Packing now makes the SimpleJson package depend on the matching `Surfdude` version.
 - The C# libraries target **net8.0** and **net10.0**; the console app and tests target **net10.0**. See [csharp/README.md](../csharp/README.md); run `dotnet test csharp/tests/Evoq.Surfdude.Tests`.
 
+## To port to Python and C# (from the Go work released as v0.2.0)
+
+GAP-11, GAP-12 and GAP-13 were built in Go first. The Go tests are the specification: copy their scenarios, not their code.
+
+### Python (`python/`, httpx)
+
+| Gap | What to do | Spec to copy |
+|-----|------------|--------------|
+| GAP-11 | **First check whether Python has the bug.** Open a plain-text 404 and ask the page that comes back with the error for `rels`, `has`, `notes`, `item`, `read`, `follow`. None may raise `AttributeError` on a missing resource. The page must keep status, headers and raw body when no dialect can read the response, and the unexpected-status error must carry `headers` and `body`. | `go/surf/unreadable_test.go` |
+| GAP-12 | Add `with_sign_in(fn)` to the surfer. `fn(from_page)` returns the token. It runs before sending when a control has `requires` and no token is held, and on a 401 (replay the request once, body intact, new token). Guards: a step that expects 401 is left alone; the sign-in step cannot re-enter the hook (use a `contextvars.ContextVar`); one replay per step; concurrent steps share one sign-in (a `threading.Lock` and a changed-token check; async is separate work); a hook that raises or returns no token fails the step with the cause chained; with no hook nothing changes. | `go/surf/signin_test.go` (ten scenarios) |
+| GAP-13 | Python has no `surftest` module yet (already listed below). When it gets one, add `golden(page, path, mask=...)` with `SURFDUDE_UPDATE_GOLDEN`, `{base}` for the page's origin, `<masked>` paths such as `data[0].expiresAt`, two-space indent, and a failure that lists the differing JSON paths. Dicts keep insertion order, so the server's key order is free. | `go/surftest/golden_test.go` |
+
+### C# (`csharp/`)
+
+| Gap | What to do | Spec to copy |
+|-----|------------|--------------|
+| GAP-11 | Check that a response no formatter can read gives a resource that is safe to ask (empty, not null), keeps the status, headers and raw body, and that the unexpected-status exception carries `Headers` and `Body`. | `go/surf/unreadable_test.go` |
+| GAP-12 | Belongs in the `HttpClient` pipeline, like retries: a `DelegatingHandler` that, on a 401 from a request not marked as expecting it, calls a sign-in delegate, sets the bearer and sends the request again once. Content can only be sent twice if buffered (`LoadIntoBufferAsync`) or rebuilt. Concurrent requests share one sign-in (`SemaphoreSlim` and a changed-token check). The wave also signs in first when a control has `requires` and no token is held. Same guards as Go. | `go/surf/signin_test.go` |
+| GAP-13 | C# has no test-helper package. Consider an existing snapshot tool (Verify, Snapper) with a scrubber for the base address and volatile fields before writing one. | `go/surftest/golden_test.go` |
+
 ## Still open (not covered by the tests above)
 
 - Python is synchronous only. An async client (`httpx.AsyncClient`) is a separate piece of work and needs its own retry and sleep seam.
