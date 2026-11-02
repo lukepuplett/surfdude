@@ -1,12 +1,37 @@
 # Surfdude
 
-Because you can surf the best APIs.
+A smart hypermedia client for RESTful APIs in Go, Python, and C#.
 
-A hypermedia client that **drives an API the way a person drives a website**: start at the front door, follow links, submit forms. Nothing in a journey names a URL or an HTTP method, only link names (`rel`s). So a journey that runs proves the API really can be driven by its own hypertext, and one that cannot says what the page did offer.
+Surfdude drives an API the way a person drives a website: start at the front door, follow links, and submit forms. Nothing in a journey hardcodes a URL path or an HTTP method, only relation names (`rel`s). If a journey runs to completion, it proves the API is genuinely navigable by its own hypertext. If it cannot, Surfdude tells you exactly what the response offered and what control was missing.
 
-## Dialect = media type
+## What is hypermedia?
 
-In Surfdude, a **dialect** is the client-side name for a **hypermedia media type**: one pluggable reader for one way the server spells links and forms in HTTP responses (and usually one primary **`Content-Type`** / **`Accept`** pair). Roy Fielding’s “design the media type” is “ship or choose a dialect”; the wave/journey code stays the same.
+`<a>` and `<form>`.
+
+Hypermedia is the addition of self-documenting controls inside the HTTP response itself, as opposed to relying on out-of-band documentation or external metadata. In other words, it is the web as designed by Tim Berners-Lee in 1989: every response tells the client what it can do next and how to do it.
+
+## Why build hypermedia APIs now?
+
+Autonomous AI agents are well capable of driving an application through its API, provided the API returns the controls to make the next move (forms and links).
+
+When an API serves true hypermedia, an agent does not need fragile hardcoded URL templates or out-of-band OpenAPI documentation that drifts out of date. The agent discovers valid actions dynamically by reading the available forms and links on each response, exactly like an online shopper moving through a website.
+
+## The testing and feedback loop
+
+When designing a website in HTML, you notice immediately when something is wrong: you cannot click through to get the job done because a button is missing or a form input is broken.
+
+With a JSON API, you cannot see or click. It is easy to assume an API is usable when it actually requires guesswork or out-of-band knowledge. To find out if an API is genuinely self-navigating, you have two choices:
+
+1. Ask an AI agent to fumble through using raw `curl` commands and burn tokens.
+2. Write automated, deterministic journey tests using a tool that drives the API using only its hypertext controls.
+
+Surfdude is that tool. If your journey test passes, your API can be driven without prior out-of-band knowledge.
+
+## Dialects: bring your own media type
+
+HTML has standard `<a>` and `<form>` tags. JSON does not. When designing a hypermedia API in JSON, you have to choose your own JSON representation for links, forms, and item collections.
+
+In HTTP and REST architecture, that representation is a media type. In Surfdude, a pluggable media-type reader is called a dialect. Roy Fielding’s maxim to "design the media type" translates to choosing or implementing a dialect; the journey code itself stays the same.
 
 | Dialect (name) | Typical `Accept` / recognition | JSON shape (short) | In this repo |
 |----------------|----------------------------------|--------------------|--------------|
@@ -30,11 +55,11 @@ The registry tries dialects in order until **`Matches`** succeeds, then **`Read`
 
 ## Getting started
 
-You can use Surfdude in two ways. You can use the standalone command-line tool named **`surf`** to inspect and crawl an API from your terminal, or you can use a client library in Python, Go, or C# to write automated journeys in code.
+You can use Surfdude in two ways. You can use the standalone command-line tool named `surf` to inspect and crawl an API from your terminal, or you can use a client library in Python, Go, or C# to write automated journeys in code.
 
 ### 1. Command-line tool (`surf`)
 
-Installing the Python package or .NET package provides a programming library, not a terminal command. If you want a command-line tool to inspect or crawl an API immediately, use the Go executable named **`surf`**.
+Installing the Python package or .NET package provides a programming library, not a terminal command. If you want a command-line tool to inspect or crawl an API immediately, use the Go executable named `surf`.
 
 #### Installation
 
@@ -208,8 +233,8 @@ A dialect is a parser that understands how a server formats links, forms, and it
 
 Surfdude includes two primary dialects:
 
-- **`simple`**: Reads the `application/simple-hypertext+json` format. It expects a JSON object containing a `links` array and optional `form` and `items` properties. Supported in Go, Python, and C#.
-- **`agenttrader`**: Reads the AgentTrader hypermedia envelope. It expects a JSON object containing `_links`, `_actions`, and `data` arrays. Supported in Go and Python.
+- `simple`: Reads the `application/simple-hypertext+json` format. It expects a JSON object containing a `links` array and optional `form` and `items` properties. Supported in Go, Python, and C#.
+- `agenttrader`: Reads the AgentTrader hypermedia envelope. It expects a JSON object containing `_links`, `_actions`, and `data` arrays. Supported in Go and Python.
 
 When you initialize a client, you pass the dialect that matches your API media type. If your API uses a different hypermedia design, you can implement the dialect interface to support your own media type. See [docs/dialects.md](docs/dialects.md) for the interface specification.
 
