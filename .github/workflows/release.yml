@@ -1,7 +1,7 @@
 name: Release
 
 # Push a semver tag vX.Y.Z (after scripts/tag-release/bump-version.sh and tests).
-# Add repository secret PYPI_API_TOKEN for PyPI (Account settings → API tokens). NuGet is manual/off for now.
+# PyPI: trusted publisher on PyPI (GitHub → release.yml, env pypi). NuGet is manual/off for now.
 
 on:
   push:
@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   verify:
@@ -39,6 +40,7 @@ jobs:
   publish:
     needs: verify
     runs-on: ubuntu-latest
+    environment: pypi
     env:
       VERSION: ${{ github.ref_name }}
     steps:
@@ -55,19 +57,12 @@ jobs:
           git push origin "$modtag"
 
       - uses: astral-sh/setup-uv@v5
-      - name: Publish to PyPI
-        env:
-          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+      - name: Publish to PyPI (trusted publisher)
         working-directory: python
         run: |
           set -euo pipefail
           uv build
-          if [ -z "${PYPI_API_TOKEN:-}" ]; then
-            echo "PYPI_API_TOKEN not set — skipping upload (see python/dist/)."
-            ls -la dist/
-            exit 0
-          fi
-          UV_PUBLISH_TOKEN="$PYPI_API_TOKEN" uv publish
+          uv publish
 
       - uses: goreleaser/goreleaser-action@v6
         with:
