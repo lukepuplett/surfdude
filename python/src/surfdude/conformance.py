@@ -92,10 +92,23 @@ def _check_control(rel: str, c: Control, w: dict[str, Any]) -> None:
         if names != w["inputs"]:
             raise AssertionError(f"{rel}: inputs = {names}, want {w['inputs']}")
     if w.get("required") is not None:
-        names = [inp.name for inp in c.inputs if inp.required]
+        names = [inp.name for inp in c.inputs if inp.required and inp.value is None]
         if names != w["required"]:
             raise AssertionError(f"{rel}: required = {names}, want {w['required']}")
     if w.get("requires") is not None and c.requires != w["requires"]:
         raise AssertionError(f"{rel}: requires = {c.requires}, want {w['requires']}")
     if w.get("ifMatch") is not None and c.if_match != w["ifMatch"]:
         raise AssertionError(f"{rel}: ifMatch = {c.if_match!r}, want {w['ifMatch']!r}")
+    if w.get("inputValues"):
+        for name, want in w["inputValues"].items():
+            inp = next((i for i in c.inputs if i.name == name), None)
+            if inp is None:
+                raise AssertionError(f"{rel}: input {name!r} not found for inputValues check")
+            if not _input_value_equal(inp.value, want):
+                raise AssertionError(f"{rel}: input {name!r} value = {inp.value!r}, want {want!r}")
+
+
+def _input_value_equal(got: Any, want: Any) -> bool:
+    if got == want:
+        return True
+    return str(got) == str(want)

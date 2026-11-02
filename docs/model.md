@@ -66,8 +66,8 @@ How each shipped dialect spells a prefilled field:
 | Dialect | Where the API puts a default field value | Notes |
 |---------|------------------------------------------|--------|
 | **agenttrader** | `"value"` on each object in `_actions[].fields` | Go and Python read this into the model. See [fixtures/agenttrader/listings-search.json](../fixtures/agenttrader/listings-search.json). |
-| **simple** | `"value"` on each object in `links[].form[]` | In the neutral model, but **not yet read** by the Go, Python, or C# simple parsers today. Use agenttrader-shaped controls or pass values from the journey until simple gains `value`. |
-| **C# simple client** | Same JSON shape as above when supported | Today only **name** and **isOptional** are read; journey code must pass every field in `ThenSubmit` until the formatter maps `value`. |
+| **simple** | `"value"` on each object in `links[].form[]` | Go, Python, and C# read it into the model and merge it on submit. Conformance: [fixtures/simple/prefilled-form.json](../fixtures/simple/prefilled-form.json). |
+| **C# simple client** | Same JSON shape | `IHypertextInputControl.Value` and merge in `BuildRequest` (prefill first, then `ThenSubmit` values). |
 
 ### If you write the journey (client code)
 

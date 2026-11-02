@@ -5,5 +5,7 @@
         public string Name { get; set; }
 
         public bool IsOptional { get; set; }
+
+        public string Value { get; set; }
     }
 }

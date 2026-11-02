@@ -7,7 +7,7 @@
     {
         public static IEnumerable<IHypertextInputControl> GetRequiredHypertextControls(this IEnumerable<IHypertextInputControl> inputs)
         {
-            return inputs.Where(i => !i.IsOptional).ToArray();
+            return inputs.Where(i => !i.IsOptional && string.IsNullOrEmpty(i.Value)).ToArray();
         }
     }
 }

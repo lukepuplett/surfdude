@@ -122,12 +122,13 @@
                   "listingId",
                   "note"
                 ],
-                "required": [
-                  "listingId"
-                ],
+                "required": [],
                 "requires": [
                   "agent-session"
-                ]
+                ],
+                "inputValues": {
+                  "listingId": "lst_seed01"
+                }
               },
               "message-seller": {
                 "form": true,
@@ -170,13 +171,14 @@
             "inputs": [
               "askingPriceGbp"
             ],
-            "required": [
-              "askingPriceGbp"
-            ],
+            "required": [],
             "requires": [
               "agent-session"
             ],
-            "ifMatch": "v3"
+            "ifMatch": "v3",
+            "inputValues": {
+              "askingPriceGbp": 3000
+            }
           },
           "human-page": {
             "form": false,

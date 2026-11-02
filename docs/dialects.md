@@ -28,7 +28,7 @@ Go and Python ship both dialects and run `/fixtures` conformance tests. The C# c
 When you add a fixture case or design a real API, spell defaults explicitly:
 
 - **AgentTrader:** `"fields": [{"name": "listingId", "required": true, "value": "lst_01"}, …]` on `_actions`.
-- **Simple:** `"form": [{"name": "skip", "isOptional": true, "value": "0"}, …]` on `links` is the intended shape; confirm your client dialect reads `value` before you depend on it (see [model.md — Form values](model.md#form-values-for-api-writers-and-for-journeys)).
+- **Simple:** `"form": [{"name": "skip", "isOptional": true, "value": "0"}, …]` on `links` — read by all clients; see [fixtures/simple/prefilled-form.json](../fixtures/simple/prefilled-form.json).
 - **Templates:** put `{variable}` or `{?a,b,c}` in `href` / `action` for values that belong in the URL; list those names in the fixture if they are not also in `form` / `fields`.
 
 Clients merge prefilled **values** with journey input, expand templates, then send the rest in the body or query. They do not infer hidden fields from a fully built URL string.

@@ -6,6 +6,7 @@ package conformance
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -51,12 +52,13 @@ type paging struct {
 }
 
 type control struct {
-	Form     bool     `json:"form"`
-	Method   string   `json:"method"`
-	Inputs   []string `json:"inputs"`
-	Required []string `json:"required"`
-	Requires []string `json:"requires"`
-	IfMatch  string   `json:"ifMatch"`
+	Form        bool           `json:"form"`
+	Method      string         `json:"method"`
+	Inputs      []string       `json:"inputs"`
+	Required    []string       `json:"required"`
+	Requires    []string       `json:"requires"`
+	IfMatch     string         `json:"ifMatch"`
+	InputValues map[string]any `json:"inputValues"`
 }
 
 // Run reads dir/cases.json and checks every case against the dialect.
@@ -175,7 +177,7 @@ func checkControl(t *testing.T, rel string, c hypertext.Control, w control) {
 	if w.Required != nil {
 		names := []string{}
 		for _, in := range c.Inputs {
-			if in.Required {
+			if in.Required && in.Value == nil {
 				names = append(names, in.Name)
 			}
 		}
@@ -189,4 +191,30 @@ func checkControl(t *testing.T, rel string, c hypertext.Control, w control) {
 	if c.IfMatch != w.IfMatch {
 		t.Errorf("%s: ifMatch = %q, want %q", rel, c.IfMatch, w.IfMatch)
 	}
+	if w.InputValues != nil {
+		for name, want := range w.InputValues {
+			var got any
+			var found bool
+			for _, in := range c.Inputs {
+				if in.Name == name {
+					got, found = in.Value, true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("%s: input %q not found for inputValues check", rel, name)
+				continue
+			}
+			if !inputValueEqual(got, want) {
+				t.Errorf("%s: input %q value = %v (%T), want %v (%T)", rel, name, got, got, want, want)
+			}
+		}
+	}
+}
+
+func inputValueEqual(got, want any) bool {
+	if reflect.DeepEqual(got, want) {
+		return true
+	}
+	return fmt.Sprint(got) == fmt.Sprint(want)
 }

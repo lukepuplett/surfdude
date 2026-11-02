@@ -64,12 +64,14 @@
                 throw new ArgumentNullException(nameof(hypertextControl));
             }
 
+            var merged = MergeSendPairs(sendPairs, hypertextControl);
+
             if (hypertextControl.Inputs != null)
             {
-                this.CheckInputs(sendPairs, hypertextControl);
+                this.CheckInputs(merged, hypertextControl);
             }
 
-            var httpRequest = this.CreateRequestWithOptionalBody(sendPairs, hypertextControl);
+            var httpRequest = this.CreateRequestWithOptionalBody(merged, hypertextControl);
 
             this.AppendHeaders(hypertextControl, httpRequest);
 
@@ -77,6 +79,28 @@
         }
 
         //
+
+        private static Dictionary<string, string> MergeSendPairs(IDictionary<string, string> sendPairs, IHypertextControl control)
+        {
+            var merged = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (control.Inputs != null)
+            {
+                foreach (var input in control.Inputs)
+                {
+                    if (!string.IsNullOrEmpty(input.Value))
+                    {
+                        merged[input.Name] = input.Value;
+                    }
+                }
+            }
+
+            foreach (var pair in sendPairs)
+            {
+                merged[pair.Key] = pair.Value;
+            }
+
+            return merged;
+        }
 
         private void AppendHeaders(IHypertextControl hypertextControl, HttpRequestMessage httpRequest)
         {

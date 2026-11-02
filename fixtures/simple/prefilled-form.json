@@ -1,0 +1,23 @@
+{
+  "links": [
+    {
+      "rel": "save-draft",
+      "description": "Save with a server-issued session token already on the form",
+      "href": "https://example.test/drafts",
+      "method": "POST",
+      "form": [
+        {"name": "sessionToken", "value": "tok_abc"},
+        {"name": "title", "label": "Title"}
+      ]
+    },
+    {
+      "rel": "search",
+      "href": "https://example.test/items{?q,skip}",
+      "form": [
+        {"name": "q", "value": "widgets", "isOptional": true},
+        {"name": "skip", "isOptional": true}
+      ]
+    }
+  ],
+  "items": []
+}

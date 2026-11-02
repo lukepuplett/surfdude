@@ -44,8 +44,8 @@ Built test first in each language. The opt-in retry rules are in [docs/model.md]
 | Item | Go | Python | C# |
 |------|----|--------|----|
 | Opt-in, step-aware retry policy, with a standard preset | `surf.WithRetry`, `surf.Retrying`, `surf.StandardRetry`, `surf.Never` | `Surfer.new(retry=)`, `retry=` on steps, `StandardRetry`, `never` | Not built in. Put a handler in the `HttpClient`; a test shows a retrying handler works across waves. |
-| POST retried only with an idempotency key | `surf.WithIdempotencyKey` | `idempotency_key=True` | Left to the handler |
-| Attempts on the page and on every report line, including the failing step | `Page.Attempts`, `ReportLine.Attempts` | `Page.attempts`, `ReportLine.attempts` | Not applicable |
+| Prefilled **`value`** on simple `form[]` and AgentTrader `fields[]` | merge on submit | merge on submit | merge in `BuildRequest` |
+| POST retried only with an idempotency key | `surf.WithIdempotencyKey` | `idempotency_key=True` | Left to the handler | `Page.Attempts`, `ReportLine.Attempts` | `Page.attempts`, `ReportLine.attempts` | Not applicable |
 | The failing step shows on the report | Fixed in `Wave.Go` | `WaveStoppedError.report` (before, the report was lost on failure) | Already the case |
 | Transport failure is a clear, wrapped error | Already so | `RequestFailedError` (before, a raw `httpx` error escaped) | Not changed |
 | Configurable timeout | `surf.WithTimeout` | `Surfer.new(timeout=)` | Set on the `HttpClient` the caller gives |

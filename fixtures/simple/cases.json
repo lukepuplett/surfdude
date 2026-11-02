@@ -62,6 +62,48 @@
           }
         ]
       }
+    },
+    {
+      "name": "prefilled values on form inputs are read into the model",
+      "file": "prefilled-form.json",
+      "contentType": "application/simple-hypertext+json",
+      "headers": {},
+      "status": 200,
+      "expect": {
+        "status": 200,
+        "rels": [
+          "save-draft",
+          "search"
+        ],
+        "controls": {
+          "save-draft": {
+            "form": true,
+            "method": "POST",
+            "inputs": [
+              "sessionToken",
+              "title"
+            ],
+            "required": [
+              "title"
+            ],
+            "inputValues": {
+              "sessionToken": "tok_abc"
+            }
+          },
+          "search": {
+            "form": true,
+            "method": "GET",
+            "inputs": [
+              "q",
+              "skip"
+            ],
+            "required": [],
+            "inputValues": {
+              "q": "widgets"
+            }
+          }
+        }
+      }
     }
   ]
 }

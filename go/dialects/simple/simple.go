@@ -53,6 +53,7 @@ type input struct {
 	Label      string   `json:"label"`
 	IsOptional bool     `json:"isOptional"`
 	Options    []string `json:"options"`
+	Value      any      `json:"value"`
 }
 
 func (Dialect) Read(resp *http.Response, body []byte) (*hypertext.Resource, error) {
@@ -75,7 +76,7 @@ func controls(links []link) []hypertext.Control {
 	for _, l := range links {
 		c := hypertext.Control{Rel: l.Rel, Title: l.Description, Href: l.Href, Method: l.Method, IfMatch: l.IfMatch, Form: len(l.Form) > 0}
 		for _, in := range l.Form {
-			hin := hypertext.Input{Name: in.Name, Required: !in.IsOptional}
+			hin := hypertext.Input{Name: in.Name, Required: !in.IsOptional, Value: in.Value}
 			schema := hypertext.Schema{}
 			if in.Label != "" {
 				schema["description"] = in.Label

@@ -62,7 +62,11 @@ def _controls(links: list) -> list[Control]:
             form=len(form) > 0,
         )
         for inp in form:
-            hin = Input(name=inp.get("name", ""), required=not inp.get("isOptional", False))
+            hin = Input(
+                name=inp.get("name", ""),
+                required=not inp.get("isOptional", False),
+                value=inp.get("value"),
+            )
             schema: Schema = {}
             if inp.get("label"):
                 schema["description"] = inp["label"]
