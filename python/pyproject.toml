@@ -1,0 +1,22 @@
+[project]
+name = "surfdude"
+version = "0.1.0"
+description = "Hypermedia API client: drive journeys by rel, not URLs"
+readme = "README.md"
+authors = [{ name = "Luke Puplett", email = "lpuplett@pacificam.co.uk" }]
+requires-python = ">=3.12"
+dependencies = ["httpx>=0.28.1"]
+
+[dependency-groups]
+dev = ["pytest>=9.0", "ruff>=0.17"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[build-system]
+requires = ["uv_build>=0.12.9,<0.13.0"]
+build-backend = "uv_build"

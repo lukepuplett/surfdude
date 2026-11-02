@@ -10,6 +10,7 @@ A hypermedia client that **drives an API the way a person drives a website**: st
 |--------|------|
 | [csharp/](csharp/) | The original client, with its `simple-hypertext+json` dialect. [Jump to its README](#c) |
 | [go/](go/) | The Go client: same journey verbs, pluggable **dialects** (the examples use **agenttrader**; C# below uses **simple**). Explorer and CLI in [go/](go/) |
+| [python/](python/) | Python client: same fixtures and model; **uv** + **pytest** — see [python/README.md](python/README.md) for toolchain |
 | [docs/](docs/) | [model.md](docs/model.md): the language-neutral model and the journey verbs. [dialects.md](docs/dialects.md): how a server's spelling is read |
 | [fixtures/](fixtures/) | Responses and expectations that every implementation must agree on |
 | [scripts/](scripts/) | `journey-agenttrader.sh` starts a local AgentTrader and drives it |
