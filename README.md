@@ -9,27 +9,58 @@ A hypermedia client that **drives an API the way a person drives a website**: st
 | Folder | What |
 |--------|------|
 | [csharp/](csharp/) | The original client, with its `simple-hypertext+json` dialect. [Jump to its README](#c) |
-| [go/](go/) | The Go client: the same idea, a richer model, pluggable **dialects**, an explorer and a command-line tool |
+| [go/](go/) | The Go client: same journey verbs, pluggable **dialects** (the examples use **agenttrader**; C# below uses **simple**). Explorer and CLI in [go/](go/) |
 | [docs/](docs/) | [model.md](docs/model.md): the language-neutral model and the journey verbs. [dialects.md](docs/dialects.md): how a server's spelling is read |
 | [fixtures/](fixtures/) | Responses and expectations that every implementation must agree on |
 | [scripts/](scripts/) | `journey-agenttrader.sh` starts a local AgentTrader and drives it |
 
-## Go in thirty seconds
+## Go sample ride
+
+The Go examples drive a running **AgentTrader** using the **agenttrader** dialect (`agenttrader.New()`). The C# sample below uses Surfdude's own **simple** dialect (`application/simple-hypertext+json`). Same idea—follow `rel`s, never hard-coded URLs—but each server spells its hypertext differently. See [docs/dialects.md](docs/dialects.md) and [fixtures/](fixtures/).
+
+Express the journey as a **wave** (like the C# client). Nothing runs until `Go`; if a step fails you get a **Report** showing how far it got.
 
 ```go
+ctx := context.Background()
 s, _ := surf.New("http://localhost:8080", surf.WithDialects(agenttrader.New()))
-home, _ := s.Root(ctx)
-results, _ := home.Submit(ctx, "search-listings", surf.Values{"make": "MINI"})
-first, _ := results.Item(0)
-_, err := first.Submit(ctx, "shortlist", surf.Values{"note": "nice colour"})
+
+_, err := surf.NewWave(s).
+	FromRoot().
+	ThenSubmit("search-listings", surf.Values{"make": "MINI"}).
+	ThenItem(0).
+	ThenSubmit("shortlist", surf.Values{"note": "nice colour"}).
+	Go(ctx)
+```
+
+That matches JSON the **agenttrader** dialect reads: an envelope with `_links`, `_actions`, and typed `fields` on each action (full cases in [fixtures/agenttrader/](fixtures/agenttrader/)). The client picks the dialect from a `Link: …/profiles/envelope/v1`; rel=`profile` header, or from the body shape.
+
+```json
+{
+  "_links": [
+    {"rel": "self", "href": "/", "method": "GET"},
+    {"rel": "new-listing", "href": "/listings/new", "method": "GET", "title": "Get the form to list a car for sale"}
+  ],
+  "_actions": [
+    {
+      "rel": "search-listings",
+      "title": "Search live listings",
+      "action": "/listings",
+      "method": "GET",
+      "fields": [
+        {"name": "make", "required": false, "schema": {"type": "string"}},
+        {"name": "maxPrice", "required": false, "schema": {"type": "integer"}}
+      ]
+    }
+  ]
+}
 ```
 
 ```sh
-cd go && go run ./cmd/surf show http://localhost:8080
+cd go && go run ./cmd/surf show http://localhost:8080   # prints which dialect read the page
 cd go && go run ./cmd/surf explore http://localhost:8080   # crawl everything reachable
 ```
 
-Design an API by writing the journey first. The errors tell you what to add to the hypertext until the journey runs.
+Design an API by writing the journey first. The errors tell you what to add to the hypertext until the journey runs. In tests, step-by-step helpers live in [go/surftest/](go/surftest/); see [go/README.md](go/README.md).
 
 ## Status and what is next
 

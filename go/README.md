@@ -22,7 +22,9 @@ go run ./cmd/surf -known-rels path/to/rels.md explore http://localhost:8080
 
 `-known-rels` takes a markdown table of backticked rels (or one rel per line). Any rel the server sends that is not on the list is reported.
 
-## Test with it
+## Journeys in code
+
+For a fluent chain like the C# client, use `surf.NewWave(s).FromRoot().Then….Go(ctx)` in [surf/wave.go](surf/wave.go). In tests, `surftest` wraps each step so failures point at the line that broke:
 
 ```go
 s := surftest.New(t, url, surf.WithDialects(agenttrader.New()))
