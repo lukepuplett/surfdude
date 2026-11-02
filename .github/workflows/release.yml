@@ -45,12 +45,19 @@ jobs:
       VERSION: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_RELEASE_PAT || github.token }}
 
       - name: Tag Go module (go/vX.Y.Z)
         run: |
           set -euo pipefail
           ver="${GITHUB_REF#refs/tags/}"
           modtag="go/${ver}"
+          if git ls-remote --exit-code origin "refs/tags/${modtag}" >/dev/null 2>&1; then
+            echo "${modtag} already on origin — skipping"
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag "$modtag" "${{ github.sha }}"
