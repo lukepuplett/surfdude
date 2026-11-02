@@ -13,7 +13,27 @@ internal/conformance/   checks a dialect against /fixtures
 
 Module path `github.com/lukepuplett/surfdude/go`. It matches the repository once that is renamed from `surfdude-csharp` to `surfdude`. Until then use a `go.work` or a `replace`. [Form values and prefills](../docs/model.md#form-values-for-api-writers-and-for-journeys) · [C# client](../csharp/README.md)
 
-## Try it on a running server
+## Installation
+
+### Command-line tool (`surf`)
+
+To install the `surf` executable to your `$GOPATH/bin`:
+
+```sh
+go install github.com/lukepuplett/surfdude/go/cmd/surf@v0.1.0
+```
+
+You can also download standalone binaries for Linux, macOS, and Windows from [GitHub Releases](https://github.com/lukepuplett/surfdude-csharp/releases).
+
+### Go client library
+
+To use Surfdude in your Go module:
+
+```sh
+go get github.com/lukepuplett/surfdude/go/surf@v0.1.0
+```
+
+## Try the CLI tool on a running server
 
 ```sh
 go run ./cmd/surf show http://localhost:8080

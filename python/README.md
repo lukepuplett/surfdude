@@ -1,8 +1,24 @@
 # Surfdude for Python
 
-Hypermedia client: drive an API by `rel` names, not URLs. Register a **dialect** per **media type** (`SimpleDialect`, `AgentTraderDialect`). Same [fixtures](../fixtures/) as Go and C#.
+A hypermedia client library that drives an API by relation names (`rel`s) instead of hardcoded URLs. You register a **dialect** that matches the server's **media type** (`SimpleDialect`, `AgentTraderDialect`). It shares the same [fixtures](../fixtures/) and neutral model as the Go and C# clients.
 
-## Toolchain (if you are new to Python here)
+Installing this package provides the `surfdude` Python library for code you write. It does not install a command-line tool. If you want a command-line tool to inspect or crawl an API from your terminal, install the Go executable named **`surf`** (see [../go/README.md](../go/README.md)).
+
+## Installation
+
+Install the package into your Python environment:
+
+```sh
+pip install surfdude==0.1.0
+```
+
+If you use `uv`, add the package to your project:
+
+```sh
+uv add surfdude==0.1.0
+```
+
+## Toolchain (if developing in this repo)
 
 | Piece | What we use | Why |
 |-------|-------------|-----|

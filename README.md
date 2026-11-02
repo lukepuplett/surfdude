@@ -28,85 +28,190 @@ The registry tries dialects in order until **`Matches`** succeeds, then **`Read`
 | [tmp/gap-tracking.md](tmp/gap-tracking.md) | Behaviour gaps found in review, what fixed each one, and what is still open |
 | [docs/releasing.md](docs/releasing.md) | **Tag `vX.Y.Z`** → Go module, PyPI (OIDC), **`surf`** on GitHub Releases; NuGet manual — [full guide](docs/releasing.md) |
 
-## Install (after a release)
+## Getting started
 
-See [docs/releasing.md](docs/releasing.md) for tagging, PyPI trusted publisher, and NuGet manual upload. Current line **0.1.0** (see [VERSION](VERSION)):
+You can use Surfdude in two ways. You can use the standalone command-line tool named **`surf`** to inspect and crawl an API from your terminal, or you can use a client library in Python, Go, or C# to write automated journeys in code.
 
-| | Command |
-|---|---------|
-| **Go library** | `go get github.com/lukepuplett/surfdude/go/surf@v0.1.0` |
-| **Go CLI** | `go install github.com/lukepuplett/surfdude/go/cmd/surf@v0.1.0` or download **`surf`** from [GitHub Releases](https://github.com/lukepuplett/surfdude-csharp/releases) |
-| **Python** | `uv add surfdude==0.1.0` or `pip install surfdude==0.1.0` (after Release workflow with OIDC has run for that tag) |
-| **.NET** | `dotnet add package Surfdude.SimpleJson.Client --version 0.1.0` — build/upload via [docs/releasing.md](docs/releasing.md#net--nuget-manual) until you publish to nuget.org |
+### 1. Command-line tool (`surf`)
 
-Automated publish today: **Go**, **PyPI**, **GitHub Release** binaries. **NuGet:** local `./scripts/tag-release/build-local.sh` then upload.
+Installing the Python package or .NET package provides a programming library, not a terminal command. If you want a command-line tool to inspect or crawl an API immediately, use the Go executable named **`surf`**.
 
-## Go sample ride
+#### Installation
 
-The Go examples drive a running **AgentTrader** using the **agenttrader** dialect (`agenttrader.New()` — the AgentTrader **media type**). The C# sample below uses the **simple** dialect (`application/simple-hypertext+json`). Same journey verbs; different **Accept** and JSON spelling. See [Dialect = media type](#dialect--media-type) and [docs/dialects.md](docs/dialects.md).
+You can download a pre-built binary for Linux, macOS, or Windows from the [GitHub Releases](https://github.com/lukepuplett/surfdude-csharp/releases) page.
 
-Express the journey as a **wave** (like the C# client). Nothing runs until `Go`; if a step fails you get a **Report** showing how far it got.
-
-```go
-ctx := context.Background()
-s, _ := surf.New("http://localhost:8080", surf.WithDialects(agenttrader.New()))
-
-_, err := surf.NewWave(s).
-	FromRoot().
-	ThenSubmit("search-listings", surf.Values{"make": "MINI"}).
-	ThenItem(0).
-	ThenSubmit("shortlist", surf.Values{"note": "nice colour"}).
-	Go(ctx)
-```
-
-That matches JSON the **agenttrader** dialect reads: an envelope with `_links`, `_actions`, and typed `fields` on each action (full cases in [fixtures/agenttrader/](fixtures/agenttrader/)). The client picks the dialect from a `Link: …/profiles/envelope/v1`; rel=`profile` header, or from the body shape.
-
-```json
-{
-  "_links": [
-    {"rel": "self", "href": "/", "method": "GET"},
-    {"rel": "new-listing", "href": "/listings/new", "method": "GET", "title": "Get the form to list a car for sale"}
-  ],
-  "_actions": [
-    {
-      "rel": "search-listings",
-      "title": "Search live listings",
-      "action": "/listings",
-      "method": "GET",
-      "fields": [
-        {"name": "make", "required": false, "schema": {"type": "string"}},
-        {"name": "maxPrice", "required": false, "schema": {"type": "integer"}}
-      ]
-    }
-  ]
-}
-```
+Alternatively, if you have Go installed on your system, you can install the executable directly into your Go bin directory:
 
 ```sh
-cd go && go run ./cmd/surf show http://localhost:8080   # prints which dialect read the page
-cd go && go run ./cmd/surf explore http://localhost:8080   # crawl everything reachable
+go install github.com/lukepuplett/surfdude/go/cmd/surf@v0.1.0
 ```
 
-Design an API by writing the journey first. The errors tell you what to add to the hypertext until the journey runs. Multi-step flows work best when each response **prepopulates** the next forms (`value` on inputs, controls on list items)—see [Stateless journeys: journal on the wire](docs/model.md#stateless-journeys-journal-on-the-wire). Field mechanics: [Form values](docs/model.md#form-values-for-api-writers-and-for-journeys). In tests, step-by-step helpers live in [go/surftest/](go/surftest/); see [go/README.md](go/README.md).
+#### Basic usage
 
-## Python sample ride
+The `surf` command-line tool starts at the front door of your API and inspects what hypertext controls the server offers:
 
-Same journey and **agenttrader** dialect as Go, with a fluent **wave** (`go()` runs the chain). Install and test with [uv](https://docs.astral.sh/uv/) — see [python/README.md](python/README.md).
+```sh
+# Print the links, forms, and matching dialect at the front door
+surf show http://localhost:8080
+
+# Crawl all reachable links and report any broken controls
+surf explore http://localhost:8080
+```
+
+---
+
+### 2. Python client library
+
+The Python library lets you write automated journeys using a fluent wave builder.
+
+#### Installation
+
+Install the package from PyPI into your environment:
+
+```sh
+pip install surfdude==0.1.0
+```
+
+If you use `uv`, add the package to your project:
+
+```sh
+uv add surfdude==0.1.0
+```
+
+#### First journey
+
+To drive an API, create an instance of `surfdude.Surfer` with your root URL and the dialect that matches your API media type. Then use `surfdude.Surfer.wave` to chain your steps:
 
 ```python
 from surfdude import AgentTraderDialect, Surfer
 
-with Surfer.new("http://localhost:8080", AgentTraderDialect()) as s:
-    s.wave().from_root().then_submit(
-        "search-listings", {"make": "MINI"}
-    ).then_item(0).then_submit(
-        "shortlist", {"note": "nice colour"}
-    ).go()
+# Connect to the API front door with the AgentTrader dialect
+with Surfer.new("http://localhost:8080", AgentTraderDialect()) as surfer:
+    # Build and execute the journey
+    report = (
+        surfer.wave()
+        .from_root()
+        .then_submit("search-listings", {"make": "MINI"})
+        .then_item(0)
+        .then_submit("shortlist", {"note": "nice colour"})
+        .go()
+    )
 ```
 
+In this journey, the client sends a `GET` request to the root URL, finds the form control named `search-listings`, submits the form with the requested query parameters, selects the first search result, and submits the `shortlist` action. Nothing in the journey hardcodes a URL path because the client discovers each address from the server response.
+
+For complete toolchain instructions, see [python/README.md](python/README.md).
+
+---
+
+### 3. Go client library
+
+The Go module provides the core hypermedia engine and pluggable dialect readers.
+
+#### Installation
+
+Add the Go module to your project:
+
 ```sh
-cd python && uv sync --all-groups && uv run pytest   # same /fixtures cases as Go
+go get github.com/lukepuplett/surfdude/go/surf@v0.1.0
 ```
+
+#### First journey
+
+Create a client using `surf.New`, specify the dialects your API supports, and execute a wave using `surf.NewWave`:
+
+```go
+package main
+
+import (
+	"context"
+
+	"github.com/lukepuplett/surfdude/go/dialects/agenttrader"
+	"github.com/lukepuplett/surfdude/go/surf"
+)
+
+func main() {
+	ctx := context.Background()
+
+	// Initialize the client with the dialect that matches your API media type
+	surfer, err := surf.New("http://localhost:8080", surf.WithDialects(agenttrader.New()))
+	if err != nil {
+		panic(err)
+	}
+
+	// Build and execute the wave
+	report, err := surf.NewWave(surfer).
+		FromRoot().
+		ThenSubmit("search-listings", surf.Values{"make": "MINI"}).
+		ThenItem(0).
+		ThenSubmit("shortlist", surf.Values{"note": "nice colour"}).
+		Go(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	_ = report
+}
+```
+
+If any step fails, the `report` value contains details about which step broke and what controls the page actually offered. For testing helpers, see `go/surftest/` and [go/README.md](go/README.md).
+
+---
+
+### 4. C# (.NET) client library
+
+The C# client targets .NET 8 and .NET 10. It drives APIs that serve the `application/simple-hypertext+json` media type through the `Evoq.Surfdude.SimpleJson` package.
+
+#### Installation
+
+Install the client package from your package source:
+
+```sh
+dotnet add package Surfdude.SimpleJson.Client --version 0.1.0
+```
+
+For manual build and package upload instructions, see [docs/releasing.md#net--nuget-manual](docs/releasing.md#net--nuget-manual).
+
+#### First journey
+
+Configure an instance of `Evoq.Surfdude.Surfer` with your base address and execute a journey asynchronously:
+
+```csharp
+using System;
+using System.Threading.Tasks;
+using Evoq.Surfdude;
+using Evoq.Surfdude.SimpleJson;
+
+class Program
+{
+    static async Task Main()
+    {
+        // Create a reusable surfer for the API
+        var surfer = Surfer.For("http://localhost:8080");
+
+        // Execute a wave starting from the root resource
+        var report = await surfer.Wave()
+            .FromRoot()
+            .Then("search-listings")
+            .GoAsync();
+    }
+}
+```
+
+To configure retries, authentication headers, or logging, pass a configured `System.Net.Http.HttpClient` to `Evoq.Surfdude.Surfer.WithHttpClient`. For full details, see [csharp/README.md](csharp/README.md).
+
+---
+
+### 5. Choosing the right dialect for your API
+
+A dialect is a parser that understands how a server formats links, forms, and item lists in HTTP response bodies.
+
+Surfdude includes two primary dialects:
+
+- **`simple`**: Reads the `application/simple-hypertext+json` format. It expects a JSON object containing a `links` array and optional `form` and `items` properties. Supported in Go, Python, and C#.
+- **`agenttrader`**: Reads the AgentTrader hypermedia envelope. It expects a JSON object containing `_links`, `_actions`, and `data` arrays. Supported in Go and Python.
+
+When you initialize a client, you pass the dialect that matches your API media type. If your API uses a different hypermedia design, you can implement the dialect interface to support your own media type. See [docs/dialects.md](docs/dialects.md) for the interface specification.
 
 ## Driving a real server
 
