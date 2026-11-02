@@ -14,6 +14,7 @@ A hypermedia client that **drives an API the way a person drives a website**: st
 | [docs/](docs/) | [model.md](docs/model.md): the language-neutral model and the journey verbs. [dialects.md](docs/dialects.md): how a server's spelling is read |
 | [fixtures/](fixtures/) | Responses and expectations that every implementation must agree on |
 | [scripts/](scripts/) | `journey-agenttrader.sh` starts a local AgentTrader and drives it |
+| [tmp/gap-tracking.md](tmp/gap-tracking.md) | Behaviour gaps + red tests (`-tags=gap`, `pytest -m gap`) |
 
 ## Go sample ride
 
