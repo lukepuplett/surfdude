@@ -1,6 +1,6 @@
 # The model
 
-Every language implementation reads a response into the same small model. A journey sees only this, never raw JSON, so a journey written against one server's dialect runs against another's.
+Every language implementation reads a response into the same small model. A journey sees only this, never raw JSON. Which parser runs is determined by the **dialect** (the **media type** reader) registered on the client—see [dialects.md](dialects.md).
 
 ## Resource
 

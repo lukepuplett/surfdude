@@ -1,6 +1,18 @@
 # Dialects
 
-A server spells its links and forms however it likes. A **dialect** knows one spelling and reads it into the model in [model.md](model.md). The client never sees raw JSON, so supporting another server means writing a dialect and nothing else.
+A server spells its links and forms however it likes. In Surfdude, a **dialect** is that spelling’s **reader** on the client—the same role people describe as a **hypermedia media type** (or a **profile** on JSON): one implementation per `Content-Type` / document convention, wired through **`Accept`**, **`Matches`**, and **`Read`**.
+
+**Dialect ≡ media type** in this documentation: the word *dialect* is what the Go and Python APIs call the plugin; *media type* is what HTTP and API design guides call the contract. The [fixtures](../fixtures/) tree is keyed by dialect name because each folder is one media-type definition.
+
+| Term in code | HTTP / design term | C# equivalent |
+|--------------|-------------------|---------------|
+| `Dialect`, `WithDialects(...)` | Media type handler, `Accept` | `IHypertextResourceFormatter`, SimpleJson package |
+| `Dialect.Accept()` | Request `Accept` header | Formatter default media type |
+| `Dialect.BodyType()` | Default POST/PUT body type | Formatter default for bodies |
+| `Dialect.Matches` | `Content-Type`, profile `Link`, shape | Chooser before read (manual today) |
+| `Dialect.Read` | Parse hypermedia → model | `ReadAsResourceAsync` |
+
+A **dialect** knows one spelling and reads it into the model in [model.md](model.md). The client never sees raw JSON for journeys; supporting another server means adding a dialect (a new media type), not changing wave code.
 
 ## The contract
 
@@ -16,10 +28,10 @@ A client holds a list of dialects and tries them in order. If none matches, the 
 
 ## Shipped
 
-| Dialect | Reads | Recognised by |
-|---------|-------|---------------|
-| `simple` | Surfdude's own `application/simple-hypertext+json`: `links` with an optional `form`, and `items` | The content type |
-| `agenttrader` | The AgentTrader envelope: `status`, `data[]`, `paging`, `_links`, `_actions`, with controls and notes on each item | A `Link: <https://agenttrader.net/profiles/envelope/v1>; rel="profile"` header, or failing that its shape |
+| Dialect | Media type (primary) | Reads | Recognised by |
+|---------|----------------------|-------|---------------|
+| `simple` | `application/simple-hypertext+json` | `links` with optional `form`, `items` | `Content-Type` |
+| `agenttrader` | `application/json` (envelope) | `status`, `data[]`, paging, `_links`, `_actions` | Profile `Link` or body shape |
 
 Go and Python ship both dialects and run `/fixtures` conformance tests. The C# client ships **simple** only today; add a formatter implementation and the same fixture files when you port **agenttrader**.
 

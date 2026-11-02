@@ -1,6 +1,6 @@
 # Surfdude for C#
 
-The original Surfdude client. It drives an API by **rel** names using the **simple** dialect (`application/simple-hypertext+json`). Go and Python in this repo share the same journey ideas and [fixtures](../fixtures/); they ship **agenttrader** as well. C# can plug in another formatter via `IHypertextResourceFormatter` (AgentTrader is still on the roadmap).
+The original Surfdude client. It drives APIs by **rel** using the **simple** media type (`application/simple-hypertext+json`) via **`Evoq.Surfdude.SimpleJson`** — the C# name for the **simple** dialect. Go/Python also ship **agenttrader**. See [Dialect = media type](../README.md#dialect--media-type).
 
 ## Toolchain
 

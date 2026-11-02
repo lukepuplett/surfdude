@@ -4,6 +4,17 @@ Because you can surf the best APIs.
 
 A hypermedia client that **drives an API the way a person drives a website**: start at the front door, follow links, submit forms. Nothing in a journey names a URL or an HTTP method, only link names (`rel`s). So a journey that runs proves the API really can be driven by its own hypertext, and one that cannot says what the page did offer.
 
+## Dialect = media type
+
+In Surfdude, a **dialect** is the client-side name for a **hypermedia media type**: one pluggable reader for one way the server spells links and forms in HTTP responses (and usually one primary **`Content-Type`** / **`Accept`** pair). Roy Fielding’s “design the media type” is “ship or choose a dialect”; the wave/journey code stays the same.
+
+| Dialect (name) | Typical `Accept` / recognition | JSON shape (short) | In this repo |
+|----------------|----------------------------------|--------------------|--------------|
+| **simple** | `application/simple-hypertext+json` | `links` + optional `form`, `items` | Go, Python, C# ([SimpleJson](csharp/)) |
+| **agenttrader** | `application/json` + AgentTrader profile `Link` (or body shape) | envelope: `_links`, `_actions`, `data[]` | Go, Python |
+
+The registry tries dialects in order until **`Matches`** succeeds, then **`Read`** fills the neutral [model](docs/model.md). Request bodies use the dialect’s **`BodyType`** when a control does not set `enctype`. In C#, the same idea is **`IHypertextResourceFormatter`** (today **`Evoq.Surfdude.SimpleJson`** = **simple** only). Full contract: [docs/dialects.md](docs/dialects.md).
+
 ## What is in here
 
 | Folder | What |
@@ -11,14 +22,14 @@ A hypermedia client that **drives an API the way a person drives a website**: st
 | [csharp/](csharp/) | The original client (**simple** dialect). **.NET 8** / **.NET 10** — [csharp/README.md](csharp/README.md) |
 | [go/](go/) | The Go client: same journey verbs, pluggable **dialects** (the examples use **agenttrader**; C# below uses **simple**). Explorer and CLI in [go/](go/) |
 | [python/](python/) | Python client: same fixtures and model; **uv** + **pytest** — see [python/README.md](python/README.md) for toolchain |
-| [docs/](docs/) | [model.md](docs/model.md): neutral model, [form values](docs/model.md#form-values-for-api-writers-and-for-journeys), [stateless multi-step journals](docs/model.md#stateless-journeys-journal-on-the-wire). [dialects.md](docs/dialects.md): dialect spelling |
+| [docs/](docs/) | [model.md](docs/model.md): neutral model, journeys, form values, stateless journals. [dialects.md](docs/dialects.md): **dialect = media type**, registry, fixtures |
 | [fixtures/](fixtures/) | Responses and expectations that every implementation must agree on |
 | [scripts/](scripts/) | `journey-agenttrader.sh` starts a local AgentTrader and drives it |
 | [tmp/gap-tracking.md](tmp/gap-tracking.md) | Behaviour gaps found in review, what fixed each one, and what is still open |
 
 ## Go sample ride
 
-The Go examples drive a running **AgentTrader** using the **agenttrader** dialect (`agenttrader.New()`). The C# sample below uses Surfdude's own **simple** dialect (`application/simple-hypertext+json`). Same idea—follow `rel`s, never hard-coded URLs—but each server spells its hypertext differently. See [docs/dialects.md](docs/dialects.md) and [fixtures/](fixtures/).
+The Go examples drive a running **AgentTrader** using the **agenttrader** dialect (`agenttrader.New()` — the AgentTrader **media type**). The C# sample below uses the **simple** dialect (`application/simple-hypertext+json`). Same journey verbs; different **Accept** and JSON spelling. See [Dialect = media type](#dialect--media-type) and [docs/dialects.md](docs/dialects.md).
 
 Express the journey as a **wave** (like the C# client). Nothing runs until `Go`; if a step fails you get a **Report** showing how far it got.
 

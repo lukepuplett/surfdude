@@ -1,6 +1,6 @@
 # Surfdude for Python
 
-Hypermedia client: drive an API by `rel` names, not URLs. Same neutral model and shared [fixtures](../fixtures/) as Go and C#. [Form values and prefills](../docs/model.md#form-values-for-api-writers-and-for-journeys) · [C# client](../csharp/README.md)
+Hypermedia client: drive an API by `rel` names, not URLs. Register a **dialect** per **media type** (`SimpleDialect`, `AgentTraderDialect`). Same [fixtures](../fixtures/) as Go and C#.
 
 ## Toolchain (if you are new to Python here)
 

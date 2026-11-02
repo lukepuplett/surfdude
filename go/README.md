@@ -3,7 +3,7 @@
 ```
 hypertext/   the neutral model: Resource, Control, Input, Schema, and helpful errors
 dialect/     the Dialect interface and the registry that picks one per response
-dialects/    simple (Surfdude's own media type) and agenttrader (the AgentTrader envelope)
+dialects/    simple and agenttrader media-type readers (see ../docs/dialects.md)
 surf/        Surfer, Page, Follow/Submit/Item/Read, the fluent Wave, and Explore
 surftest/    helpers that fail a Go test with the helpful error
 cmd/surf/    the command line: show and explore
