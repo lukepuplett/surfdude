@@ -50,3 +50,7 @@ with Surfer.new("http://localhost:8080", AgentTraderDialect()) as s:
 ```
 
 See [../docs/model.md](../docs/model.md) and [../docs/dialects.md](../docs/dialects.md).
+
+## Publishing
+
+PyPI package **`surfdude`**: tag **`vX.Y.Z`** on the repo triggers [Release workflow](../.github/workflows/release.yml) (trusted publisher OIDC). Install: `pip install surfdude==X.Y.Z`. Full process: [../docs/releasing.md](../docs/releasing.md).

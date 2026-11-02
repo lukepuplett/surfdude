@@ -43,7 +43,7 @@ cd csharp && dotnet test Evoq.Surfdude.sln
 
 Go live journeys may skip if AgentTrader is unreachable from the environment.
 
-**Releasing:** [docs/releasing.md](docs/releasing.md) — bump `VERSION`, tag `vX.Y.Z`, GitHub Actions publishes NuGet/PyPI/GoReleaser when secrets are set. Scripts under `scripts/tag-release/`.
+**Releasing:** [docs/releasing.md](docs/releasing.md) — `./scripts/tag-release/bump-version.sh`, tag **`vX.Y.Z`** on **`master`**, Release workflow publishes **Go / PyPI (OIDC) / GoReleaser**; **NuGet manual**. Optional secret **`GH_RELEASE_PAT`** if Actions cannot push **`go/v…`**. Tag pins the workflow commit — see doc **“Tag pins the workflow file”**.
 
 ---
 

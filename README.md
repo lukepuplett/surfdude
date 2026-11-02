@@ -26,18 +26,20 @@ The registry tries dialects in order until **`Matches`** succeeds, then **`Read`
 | [fixtures/](fixtures/) | Responses and expectations that every implementation must agree on |
 | [scripts/](scripts/) | `journey-agenttrader.sh` starts a local AgentTrader and drives it |
 | [tmp/gap-tracking.md](tmp/gap-tracking.md) | Behaviour gaps found in review, what fixed each one, and what is still open |
-| [docs/releasing.md](docs/releasing.md) | **One tag → NuGet, PyPI, Go module, `surf` binaries** — accounts, secrets, bump scripts |
+| [docs/releasing.md](docs/releasing.md) | **Tag `vX.Y.Z`** → Go module, PyPI (OIDC), **`surf`** on GitHub Releases; NuGet manual — [full guide](docs/releasing.md) |
 
 ## Install (after a release)
 
-See [docs/releasing.md](docs/releasing.md) for accounts and tagging. Current line **0.1.0** (see [VERSION](VERSION)):
+See [docs/releasing.md](docs/releasing.md) for tagging, PyPI trusted publisher, and NuGet manual upload. Current line **0.1.0** (see [VERSION](VERSION)):
 
 | | Command |
 |---|---------|
 | **Go library** | `go get github.com/lukepuplett/surfdude/go/surf@v0.1.0` |
 | **Go CLI** | `go install github.com/lukepuplett/surfdude/go/cmd/surf@v0.1.0` or download **`surf`** from [GitHub Releases](https://github.com/lukepuplett/surfdude-csharp/releases) |
-| **Python** | `uv add surfdude==0.1.0` |
-| **.NET** | `dotnet add package Surfdude.SimpleJson.Client --version 0.1.0` |
+| **Python** | `uv add surfdude==0.1.0` or `pip install surfdude==0.1.0` (after Release workflow with OIDC has run for that tag) |
+| **.NET** | `dotnet add package Surfdude.SimpleJson.Client --version 0.1.0` — build/upload via [docs/releasing.md](docs/releasing.md#net--nuget-manual) until you publish to nuget.org |
+
+Automated publish today: **Go**, **PyPI**, **GitHub Release** binaries. **NuGet:** local `./scripts/tag-release/build-local.sh` then upload.
 
 ## Go sample ride
 
@@ -147,13 +149,12 @@ await surfer.Wave(c => c.ExpectedStatusCodes = new[] { 200, 404 })
 
 The Go client is new (November 2026): two dialects, an explorer, a command-line tool and first journeys against AgentTrader. The C# client is the original. It now has a reusable `Surfer`, its first unit tests in [csharp/tests/Evoq.Surfdude.Tests](csharp/tests/Evoq.Surfdude.Tests), and targets **.NET 8** and **.NET 10** (apps and tests on **.NET 10** LTS).
 
+- **GitHub Actions CI** on **`master`** (Go, Python, C#) — see [docs/releasing.md](docs/releasing.md).
+- **Tag releases** **`vX.Y.Z`**: Go module tag **`go/v…`**, PyPI via **trusted publisher**, **`surf`** on GitHub Releases; **NuGet** is manual for now.
 - **Rename this repository** from `surfdude-csharp` to `surfdude`. The Go module path (`github.com/lukepuplett/surfdude/go`) already assumes it. Until then, use a `go.work` or a `replace`.
 - **Teach the C# client the AgentTrader envelope.** It already has the seam (`IHypertextResourceFormatter`); the shared [fixtures](fixtures/) say what a correct reading looks like.
 - **A small dialect for x402 `402` bodies,** which are not the AgentTrader envelope.
 - **More dialects:** HAL, Siren, and HTML (`a` is a link, `form` is a form).
-- **CI for C#** — `dotnet test` on [csharp/tests/Evoq.Surfdude.Tests](csharp/tests/Evoq.Surfdude.Tests); see [csharp/README.md](csharp/README.md).
-- **CI for Go** and a first tag, `go/v0.1.0`.
-- **Release plumbing** is in place ([docs/releasing.md](docs/releasing.md), GitHub Actions, `VERSION`); add **NuGet** and **PyPI** secrets and push **`v*`** tags to publish.
 - **The C# model** is thinner than the Go one: inputs have a name and an optional flag, with no schema. It can grow to match [docs/model.md](docs/model.md).
 
 ---

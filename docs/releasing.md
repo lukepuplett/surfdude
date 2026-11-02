@@ -1,19 +1,19 @@
 # Releasing Surfdude
 
-One **semver** for Go, Python, and .NET, one **git tag** `vX.Y.Z`, one **GitHub Actions** workflow that publishes everywhere. You create registry accounts once, store **API tokens as GitHub secrets**, and never upload through a web UI unless you want to.
+One **semver** in [`VERSION`](../VERSION) for Go, Python, and .NET. One **git tag** `vX.Y.Z` triggers [.github/workflows/release.yml](../.github/workflows/release.yml), which publishes **Go** (module tag), **Python** (PyPI), and **`surf`** binaries (GitHub Releases). **NuGet is not automated** in that workflow; build and upload `.nupkg` yourself when ready.
 
-## Accounts (one-time)
+## What ships where
 
-| Registry | Sign up | Credential | GitHub secret |
-|----------|---------|------------|---------------|
-| [nuget.org](https://www.nuget.org) | Organisation or user | Profile → **API keys** → create | `NUGET_API_KEY` |
-| [pypi.org](https://pypi.org) | User + **2FA** recommended | Account → **API tokens** → scope to project `surfdude` | `PYPI_API_TOKEN` |
-| **Go** | *(none)* | Public git tags on this repo | — |
-| **GitHub Releases** (`surf` binary) | Same repo | `GITHUB_TOKEN` (automatic in Actions) | — |
+| Output | How | Credential |
+|--------|-----|------------|
+| **Go module** `github.com/lukepuplett/surfdude/go` | Tag **`go/vX.Y.Z`** on the same commit as **`vX.Y.Z`** | Public git tags on this repo |
+| **Python** [`surfdude`](https://pypi.org/project/surfdude/) on PyPI | `uv publish` in Release workflow | **Trusted publisher** (GitHub OIDC) — no PyPI API token in secrets |
+| **`surf` CLI** (linux / darwin / windows) | [GoReleaser](../.goreleaser.yaml) → GitHub Release for **`vX.Y.Z`** | `GITHUB_TOKEN` in Actions (automatic) |
+| **.NET** packages `Surfdude`, `Surfdude.SimpleJson.Client` | Manual (or local `dotnet nuget push`) | [nuget.org](https://www.nuget.org) API key on your machine |
 
-Go modules use tags `go/vX.Y.Z` on the same commit as `vX.Y.Z`. The release workflow creates `go/v…` after you push `v…`.
+GitHub repo name is still **`surfdude-csharp`**; the Go module path in [`go/go.mod`](../go/go.mod) already uses **`surfdude`**.
 
-Optional: run `./scripts/tag-release/build-local.sh` and upload `.nupkg` / wheels manually with `dotnet nuget push` and `uv publish` if CI is not wired yet.
+---
 
 ## Version source of truth
 
@@ -23,17 +23,39 @@ Optional: run `./scripts/tag-release/build-local.sh` and upload `.nupkg` / wheel
 | [`python/pyproject.toml`](../python/pyproject.toml) | `version = "X.Y.Z"` |
 | [`csharp/Directory.Build.props`](../csharp/Directory.Build.props) | `Version` / `PackageVersion` |
 
-Keep them aligned:
+Align with:
 
 ```sh
 ./scripts/tag-release/bump-version.sh 0.2.0
 ./scripts/tag-release/check.sh
 ```
 
+`check.sh` runs Go, Python, and .NET tests and checks that the three version fields match `VERSION`.
+
+Local artifacts (no publish):
+
+```sh
+./scripts/tag-release/build-local.sh
+```
+
+Outputs under `/tmp/surfdude-release/` (`.nupkg`, wheels, local `surf` binary).
+
+---
+
+## CI vs release
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| [.github/workflows/ci.yml](../.github/workflows/ci.yml) | Push / PR to **`master`** | Tests + `VERSION` consistency |
+| [.github/workflows/release.yml](../.github/workflows/release.yml) | Push tag **`v*.*.*`** | Tests again, then publish Go / PyPI / GitHub Release |
+| [`azure-pipelines.yaml`](../azure-pipelines.yaml) | Azure DevOps | **CI only** (build + test). No NuGet push on every build. |
+
+---
+
 ## Release flow (normal)
 
-1. Merge work to **`master`** (CI runs [.github/workflows/ci.yml](../.github/workflows/ci.yml): Go, Python, .NET, version check).
-2. Bump version when ready for a release (script above).
+1. Merge to **`master`** until [CI](../.github/workflows/ci.yml) is green.
+2. Bump when ready: `./scripts/tag-release/bump-version.sh X.Y.Z` and `./scripts/tag-release/check.sh`.
 3. Commit, tag, push:
 
    ```sh
@@ -43,41 +65,161 @@ Keep them aligned:
    git push origin v0.2.0
    ```
 
-4. [.github/workflows/release.yml](../.github/workflows/release.yml) runs on the tag:
-   - Confirms tag matches `VERSION`
-   - Re-runs tests
-   - Tags **`go/v0.2.0`** for `go get github.com/lukepuplett/surfdude/go@v0.2.0`
-   - **`dotnet pack`** → NuGet.org (if `NUGET_API_KEY` set; otherwise packs only, logs skip)
-   - **`uv build` / `uv publish`** → PyPI (if `PYPI_API_TOKEN` set)
-   - **GoReleaser** → GitHub Release with **`surf`** binaries (linux/darwin/windows)
+4. Open **Actions → Release** for the tag. When it succeeds:
+   - **`go/v0.2.0`** exists (unless it was already pushed — workflow skips duplicates).
+   - **PyPI** has `surfdude==0.2.0` (if trusted publisher is configured — see below).
+   - **GitHub Releases** has **`v0.2.0`** with **`surf`** assets.
 
-If secrets are missing, the workflow still passes but skips upload and prints where local artifacts would go—useful for dry runs.
+### Tag pins the workflow file
 
-## What consumers run after `v0.1.0`
+GitHub runs **the `release.yml` (and permissions) from the commit the tag points at**, not from latest `master`.
 
-Replace `0.1.0` with the tag you shipped.
+If you tag an older commit, you get that commit’s release steps (for example an older PyPI step that skipped upload when no API token was set). **Merge release workflow changes to `master` first**, then create the **`vX.Y.Z`** tag on that commit (or bump patch and tag again). Re-running an old workflow run does not pick up newer workflow files on `master`.
+
+---
+
+## PyPI — trusted publisher (recommended)
+
+No **`PYPI_API_TOKEN`** secret is required when OIDC is set up.
+
+### One-time on PyPI
+
+Account → **Trusted Publisher Management** → **Add a new pending publisher** (project **`surfdude`** may not exist until the first upload):
+
+| Field | Value |
+|--------|--------|
+| PyPI project name | `surfdude` |
+| Owner | `lukepuplett` |
+| Repository name | `surfdude-csharp` |
+| Workflow name | `release.yml` (filename under `.github/workflows/`, not the workflow display name) |
+| Environment name | `pypi` (optional on PyPI; use **`pypi`** on GitHub — see below) |
+
+After the first successful publish, the pending publisher becomes a normal project publisher.
+
+### One-time on GitHub
+
+Repo **Settings → Environments → New environment** → name **`pypi`**.
+
+The Release **publish** job uses `environment: pypi`. The workflow sets `permissions: id-token: write` so **`uv publish`** can authenticate via OIDC.
+
+### Manual PyPI (fallback)
+
+From `python/` after `uv build`:
+
+```sh
+UV_PUBLISH_TOKEN='pypi-…' uv publish
+```
+
+Or upload wheels from `./scripts/tag-release/build-local.sh` via the PyPI web UI.
+
+---
+
+## Go module tag `go/vX.Y.Z`
+
+Consumers:
+
+```sh
+go get github.com/lukepuplett/surfdude/go/surf@v0.2.0
+go install github.com/lukepuplett/surfdude/go/cmd/surf@v0.2.0
+```
+
+The Release workflow creates **`go/vX.Y.Z`** pointing at the tagged commit.
+
+### When Actions cannot push `go/v…`
+
+If the **release commit changes files under `.github/workflows/`**, GitHub’s default **`GITHUB_TOKEN`** may refuse to push the module tag (same class of error as pushing workflow changes from a local OAuth token without **`workflow`** scope).
+
+**Fixes:**
+
+1. **Optional secret `GH_RELEASE_PAT`:** fine-grained or classic PAT with **Contents** and **Workflows** write. Checkout uses it for the publish job so `git push origin go/v…` succeeds.
+2. **Push the module tag locally** (your `gh`/git already has **`workflow`** scope if you fixed Actions pushes from your machine):
+
+   ```sh
+   git fetch origin tag v0.2.0
+   git tag go/v0.2.0 v0.2.0
+   git push origin go/v0.2.0
+   ```
+
+If **`go/v…`** already exists on the remote, the workflow skips creating it.
+
+### Pushing workflow files from your machine
+
+If `git push` rejects updates to `.github/workflows/*`, refresh GitHub CLI auth:
+
+```sh
+gh auth refresh -h github.com -s workflow
+```
+
+Git credential helper should use **`gh auth git-credential`** for `github.com`.
+
+---
+
+## GitHub Releases (`surf` binary)
+
+[`.goreleaser.yaml`](../.goreleaser.yaml) builds [`go/cmd/surf`](../go/cmd/surf) for common OS/arch pairs. GoReleaser attaches assets to the Release for tag **`vX.Y.Z`**.
+
+Download from [GitHub Releases](https://github.com/lukepuplett/surfdude-csharp/releases) or use **`go install`** (see above).
+
+---
+
+## .NET / NuGet (manual)
+
+The Release workflow **does not** pack or push NuGet packages. Reasons in practice: separate Microsoft account / API key flow; packages can ship on a different cadence than Go/Python.
+
+Build packages locally:
+
+```sh
+./scripts/tag-release/build-local.sh
+# or
+dotnet pack csharp/Evoq.Surfdude.sln -c Release -o ./artifacts/nupkg
+```
+
+Upload **`Surfdude.*.nupkg`** and **`Surfdude.SimpleJson.Client.*.nupkg`** (not the console app unless you intend to publish it):
+
+```sh
+dotnet nuget push ./artifacts/nupkg/Surfdude.0.1.0.nupkg \
+  --api-key YOUR_KEY --source https://api.nuget.org/v3/index.json
+```
+
+To automate NuGet later, add a pack/push step back to `release.yml` and secret **`NUGET_API_KEY`**.
+
+---
+
+## What consumers run
+
+Replace **`0.1.0`** with the version you shipped.
 
 | Ecosystem | Library | CLI |
 |-----------|---------|-----|
-| **Go** | `go get github.com/lukepuplett/surfdude/go/surf@v0.1.0` | `go install github.com/lukepuplett/surfdude/go/cmd/surf@v0.1.0` |
-| **Python** | `uv add surfdude==0.1.0` or `pip install surfdude==0.1.0` | *(library only today; CLI via `go install` or GitHub Release binary)* |
-| **.NET** | `dotnet add package Surfdude --version 0.1.0` and `Surfdude.SimpleJson.Client` | *(no global tool yet)* |
+| **Go** | `go get github.com/lukepuplett/surfdude/go/surf@v0.1.0` | `go install github.com/lukepuplett/surfdude/go/cmd/surf@v0.1.0` or GitHub Release **`surf`** |
+| **Python** | `uv add surfdude==0.1.0` or `pip install surfdude==0.1.0` | Go **`surf`** or Release binary (no PyPI CLI yet) |
+| **.NET** | `dotnet add package Surfdude --version 0.1.0` and `Surfdude.SimpleJson.Client` | No global tool yet |
 
-Module path still says `surfdude-csharp` on GitHub until the repo rename; `go get` uses the module path in [`go/go.mod`](../go/go.mod).
-
-## Azure Pipelines
-
-[`azure-pipelines.yaml`](../azure-pipelines.yaml) is **CI only** (build + test). It does **not** push to NuGet on every build. Use GitHub tag releases for publishing, or add a separate manual pipeline gated on tags if PAM standardises on Azure Artifacts later.
+---
 
 ## First-time checklist
 
-- [ ] Create NuGet.org account; register package ids **Surfdude** / **Surfdude.SimpleJson.Client** (or verify you own them).
-- [ ] Create PyPI account; reserve name **`surfdude`** (upload first release claims it).
-- [ ] In GitHub repo **Settings → Secrets and variables → Actions**, add `NUGET_API_KEY` and `PYPI_API_TOKEN`.
-- [ ] Run `./scripts/tag-release/check.sh` on `master`.
-- [ ] Push tag `v0.1.0` (or bump first), confirm Release workflow green.
-- [ ] Smoke-test install commands from the table above.
+- [ ] PyPI **pending trusted publisher** for **`surfdude`** → `lukepuplett/surfdude-csharp`, workflow **`release.yml`**, environment **`pypi`** (or “Any” on PyPI if you omit GitHub environment — not recommended).
+- [ ] GitHub environment **`pypi`** created.
+- [ ] Optional **`GH_RELEASE_PAT`** if module tag push fails from Actions.
+- [ ] `./scripts/tag-release/check.sh` green on **`master`**.
+- [ ] Push **`vX.Y.Z`** on a commit that includes the current **`release.yml`** (OIDC PyPI step).
+- [ ] Smoke-test Go get, PyPI install, and Release **`surf`** binary.
+- [ ] NuGet: when ready, manual upload from **`build-local.sh`** output.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely cause |
+|---------|----------------|
+| Release green but **no PyPI project** | Tag pointed at an **old** commit whose workflow skipped PyPI (no token / pre-OIDC). Tag again from current **`master`** or publish manually. |
+| **`go/v…` push failed** in Actions | Release commit touched **workflows**; add **`GH_RELEASE_PAT`** or push **`go/v…`** locally. |
+| **`git push` rejected** for workflow files locally | Run **`gh auth refresh -h github.com -s workflow`**. |
+| GoReleaser failed | Check Actions log; tag must match **`VERSION`** and tests must pass in **verify** job. |
+
+---
 
 ## Internal (Pacific AM)
 
-For private feeds, replace NuGet/PyPI URLs with **Azure Artifacts** (or similar) in the release workflow and use the same `.nupkg` / wheel artifacts—no change to how you build them.
+For private feeds, point **`uv publish`** and **`dotnet nuget push`** at Azure Artifacts (or similar) in a fork of the release workflow; build steps stay the same.

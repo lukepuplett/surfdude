@@ -34,3 +34,7 @@ problems := surftest.Refused(t, home, "create-listing", surf.Values{"reg": ""}, 
 ```
 
 See [../docs/model.md](../docs/model.md) and [../docs/dialects.md](../docs/dialects.md).
+
+## Publishing
+
+Module tags **`go/vX.Y.Z`** with release tag **`vX.Y.Z`**; CLI **`surf`** on [GitHub Releases](https://github.com/lukepuplett/surfdude-csharp/releases). [../docs/releasing.md](../docs/releasing.md).
