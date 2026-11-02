@@ -86,6 +86,17 @@ s := surftest.New(t, url, surf.WithDialects(agenttrader.New()), surf.WithSignIn(
 
 The hook runs in two situations. When a control needs a session and the surfer holds no token, it signs in first instead of refusing the step. When a step is refused with a 401, it signs in and sends the same request again, once. Any number of steps that fail together share one sign-in. A step that says `surf.Expect(401)` is testing the refusal, so it is left alone, and the sign-in step itself can never call the hook. Without `WithSignIn` nothing changes: a step that needs a session with no token is refused before any request is sent.
 
+### Recording samples from the real response
+
+A documented sample that is typed by hand drifts. `surftest.Golden` records it from the response instead, and fails when the response changes:
+
+```go
+home := surftest.Root(t, s)
+surftest.Golden(t, home, "../../doc/samples/get-home.json", surftest.Mask("data[0].expiresAt"))
+```
+
+It makes the body repeatable before comparing: the test server's address becomes `{base}` (its port changes every run), masked fields become `<masked>`, and the JSON is indented by two spaces with the server's own key order kept, so the file reads like the response and a diff shows only what changed. Run the test with `SURFDUDE_UPDATE_GOLDEN=1` to write the file, then review the diff before committing it. Without that variable it never writes, and a mismatch lists the JSON paths that differ.
+
 See [../docs/model.md](../docs/model.md) and [../docs/dialects.md](../docs/dialects.md).
 
 ## Publishing

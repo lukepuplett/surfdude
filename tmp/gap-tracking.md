@@ -26,6 +26,7 @@ Last updated: 2026-11-02
 | GAP-10 | Duplicate `rel` | A resource can report which rels appear on more than one control. This is reporting only; it does not yet change which control wins. | `Resource.DuplicateRels` | `Resource.duplicate_rels` |
 | GAP-11 | A response no dialect can read | The page that comes back with the error can be asked for rels, notes, items and the body without a panic (Go dereferenced a nil `Resource`), and `UnexpectedStatusError` carries `Header` and `Body`, so a test can read `Retry-After` or `WWW-Authenticate` or see a proxy's plain-text page from the error alone. | `finish` in `surf/surf.go`, `UnexpectedStatusError.Header` and `.Body` | not checked yet |
 | GAP-12 | Sign in again | A surfer can be given `WithSignIn(func)`. It signs in before sending when a control needs a session and no token is held, and signs in and replays the request once on a 401. Concurrent steps share one sign-in; an expected 401 and the sign-in step itself never trigger it. | `WithSignIn`, `signInAgain` in `surf/surf.go` | not built |
+| GAP-13 | Record samples from the real response | `surftest.Golden` checks a response against a checked-in JSON file, replacing the server's address with `{base}`, masking volatile fields, keeping the server's key order, and writing the file when `SURFDUDE_UPDATE_GOLDEN` is set. A mismatch lists the JSON paths that differ. | `surftest.Golden`, `surftest.Mask` | not built |
 
 ## Behaviour to know about
 
