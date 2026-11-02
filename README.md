@@ -68,7 +68,7 @@ You can download a pre-built binary for Linux, macOS, or Windows from the [GitHu
 Alternatively, if you have Go installed on your system, you can install the executable directly into your Go bin directory:
 
 ```sh
-go install github.com/lukepuplett/surfdude/go/cmd/surf@v0.1.0
+go install github.com/lukepuplett/surfdude/go/cmd/surf@v0.2.0
 ```
 
 #### Basic usage
@@ -138,7 +138,7 @@ The Go module provides the core hypermedia engine and pluggable dialect readers.
 Add the Go module to your project:
 
 ```sh
-go get github.com/lukepuplett/surfdude/go/surf@v0.1.0
+go get github.com/lukepuplett/surfdude/go/surf@v0.2.0
 ```
 
 #### First journey

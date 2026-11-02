@@ -11,7 +11,7 @@ examples/    journeys against a running AgentTrader
 internal/conformance/   checks a dialect against /fixtures
 ```
 
-Module path `github.com/lukepuplett/surfdude/go`. It matches the repository, which was renamed from `surfdude-csharp` to `surfdude` on 2026-11-02, so `go get github.com/lukepuplett/surfdude/go@v0.1.0` needs no `go.work` or `replace`. The public proxy may serve a stale failure for a short while after the rename: `GOPROXY=direct GONOSUMDB=github.com/lukepuplett/surfdude` works around it. [Form values and prefills](../docs/model.md#form-values-for-api-writers-and-for-journeys) · [C# client](../csharp/README.md)
+Module path `github.com/lukepuplett/surfdude/go`. It matches the repository, which was renamed from `surfdude-csharp` to `surfdude` on 2026-11-02, so `go get github.com/lukepuplett/surfdude/go@v0.2.0` needs no `go.work` or `replace`. The public proxy may serve a stale failure for a short while after the rename: `GOPROXY=direct GONOSUMDB=github.com/lukepuplett/surfdude` works around it. [Form values and prefills](../docs/model.md#form-values-for-api-writers-and-for-journeys) · [C# client](../csharp/README.md)
 
 ## Installation
 
@@ -20,7 +20,7 @@ Module path `github.com/lukepuplett/surfdude/go`. It matches the repository, whi
 To install the `surf` executable to your `$GOPATH/bin`:
 
 ```sh
-go install github.com/lukepuplett/surfdude/go/cmd/surf@v0.1.0
+go install github.com/lukepuplett/surfdude/go/cmd/surf@v0.2.0
 ```
 
 You can also download standalone binaries for Linux, macOS, and Windows from [GitHub Releases](https://github.com/lukepuplett/surfdude/releases).
@@ -30,7 +30,7 @@ You can also download standalone binaries for Linux, macOS, and Windows from [Gi
 To use Surfdude in your Go module:
 
 ```sh
-go get github.com/lukepuplett/surfdude/go/surf@v0.1.0
+go get github.com/lukepuplett/surfdude/go/surf@v0.2.0
 ```
 
 ## Try the CLI tool on a running server
