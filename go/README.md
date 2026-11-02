@@ -11,7 +11,7 @@ examples/    journeys against a running AgentTrader
 internal/conformance/   checks a dialect against /fixtures
 ```
 
-Module path `github.com/lukepuplett/surfdude/go`. It matches the repository once that is renamed from `surfdude-csharp` to `surfdude`. Until then use a `go.work` or a `replace`. [Form values and prefills](../docs/model.md#form-values-for-api-writers-and-for-journeys) · [C# client](../csharp/README.md)
+Module path `github.com/lukepuplett/surfdude/go`. It matches the repository, which was renamed from `surfdude-csharp` to `surfdude` on 2026-11-02, so `go get github.com/lukepuplett/surfdude/go@v0.1.0` needs no `go.work` or `replace`. The public proxy may serve a stale failure for a short while after the rename: `GOPROXY=direct GONOSUMDB=github.com/lukepuplett/surfdude` works around it. [Form values and prefills](../docs/model.md#form-values-for-api-writers-and-for-journeys) · [C# client](../csharp/README.md)
 
 ## Installation
 
@@ -23,7 +23,7 @@ To install the `surf` executable to your `$GOPATH/bin`:
 go install github.com/lukepuplett/surfdude/go/cmd/surf@v0.1.0
 ```
 
-You can also download standalone binaries for Linux, macOS, and Windows from [GitHub Releases](https://github.com/lukepuplett/surfdude-csharp/releases).
+You can also download standalone binaries for Linux, macOS, and Windows from [GitHub Releases](https://github.com/lukepuplett/surfdude/releases).
 
 ### Go client library
 
@@ -57,4 +57,4 @@ See [../docs/model.md](../docs/model.md) and [../docs/dialects.md](../docs/diale
 
 ## Publishing
 
-Module tags **`go/vX.Y.Z`** with release tag **`vX.Y.Z`**; CLI **`surf`** on [GitHub Releases](https://github.com/lukepuplett/surfdude-csharp/releases). [../docs/releasing.md](../docs/releasing.md).
+Module tags **`go/vX.Y.Z`** with release tag **`vX.Y.Z`**; CLI **`surf`** on [GitHub Releases](https://github.com/lukepuplett/surfdude/releases). [../docs/releasing.md](../docs/releasing.md).

@@ -11,7 +11,7 @@ One **semver** in [`VERSION`](../VERSION) for Go, Python, and .NET. One **git ta
 | **`surf` CLI** (linux / darwin / windows) | [GoReleaser](../.goreleaser.yaml) → GitHub Release for **`vX.Y.Z`** | `GITHUB_TOKEN` in Actions (automatic) |
 | **.NET** packages `Surfdude`, `Surfdude.SimpleJson.Client` | Manual (or local `dotnet nuget push`) | [nuget.org](https://www.nuget.org) API key on your machine |
 
-GitHub repo name is still **`surfdude-csharp`**; the Go module path in [`go/go.mod`](../go/go.mod) already uses **`surfdude`**.
+The GitHub repo was renamed from `surfdude-csharp` to **`surfdude`** on 2026-11-02 (old URLs redirect). The Go module path in [`go/go.mod`](../go/go.mod) uses **`surfdude`** and now resolves.
 
 ---
 
@@ -90,7 +90,7 @@ Account → **Trusted Publisher Management** → **Add a new pending publisher**
 |--------|--------|
 | PyPI project name | `surfdude` |
 | Owner | `lukepuplett` |
-| Repository name | `surfdude-csharp` |
+| Repository name | `surfdude` |
 | Workflow name | `release.yml` (filename under `.github/workflows/`, not the workflow display name) |
 | Environment name | `pypi` (optional on PyPI; use **`pypi`** on GitHub — see below) |
 
@@ -158,7 +158,7 @@ Git credential helper should use **`gh auth git-credential`** for `github.com`.
 
 [`.goreleaser.yaml`](../.goreleaser.yaml) builds [`go/cmd/surf`](../go/cmd/surf) for common OS/arch pairs. GoReleaser attaches assets to the Release for tag **`vX.Y.Z`**.
 
-Download from [GitHub Releases](https://github.com/lukepuplett/surfdude-csharp/releases) or use **`go install`** (see above).
+Download from [GitHub Releases](https://github.com/lukepuplett/surfdude/releases) or use **`go install`** (see above).
 
 ---
 
@@ -199,7 +199,7 @@ Replace **`0.1.0`** with the version you shipped.
 
 ## First-time checklist
 
-- [ ] PyPI **pending trusted publisher** for **`surfdude`** → `lukepuplett/surfdude-csharp`, workflow **`release.yml`**, environment **`pypi`** (or “Any” on PyPI if you omit GitHub environment — not recommended).
+- [ ] PyPI **pending trusted publisher** for **`surfdude`** → `lukepuplett/surfdude`, workflow **`release.yml`**, environment **`pypi`** (or “Any” on PyPI if you omit GitHub environment — not recommended).
 - [ ] GitHub environment **`pypi`** created.
 - [ ] Optional **`GH_RELEASE_PAT`** if module tag push fails from Actions.
 - [ ] `./scripts/tag-release/check.sh` green on **`master`**.

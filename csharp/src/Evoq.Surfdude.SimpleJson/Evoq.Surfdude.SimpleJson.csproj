@@ -9,7 +9,7 @@
     <description>Surfdude dynamically drives really RESTful APIs. This package works with APIs that return SimpleJson.</description>
     <packageTags>rest;restful;api;refit;hateoas;hypertext;hypermedia;json</packageTags>
     <packageId>Surfdude.SimpleJson.Client</packageId>
-    <repositoryUrl>https://github.com/lukepuplett/surfdude-csharp</repositoryUrl>
+    <repositoryUrl>https://github.com/lukepuplett/surfdude</repositoryUrl>
 
   </PropertyGroup>
 

@@ -63,7 +63,7 @@ Installing the Python package or .NET package provides a programming library, no
 
 #### Installation
 
-You can download a pre-built binary for Linux, macOS, or Windows from the [GitHub Releases](https://github.com/lukepuplett/surfdude-csharp/releases) page.
+You can download a pre-built binary for Linux, macOS, or Windows from the [GitHub Releases](https://github.com/lukepuplett/surfdude/releases) page.
 
 Alternatively, if you have Go installed on your system, you can install the executable directly into your Go bin directory:
 
@@ -281,7 +281,7 @@ The Go client is new (November 2026): two dialects, an explorer, a command-line 
 
 - **GitHub Actions CI** on **`master`** (Go, Python, C#) — see [docs/releasing.md](docs/releasing.md).
 - **Tag releases** **`vX.Y.Z`**: Go module tag **`go/v…`**, PyPI via **trusted publisher**, **`surf`** on GitHub Releases; **NuGet** is manual for now.
-- **Rename this repository** from `surfdude-csharp` to `surfdude`. The Go module path (`github.com/lukepuplett/surfdude/go`) already assumes it. Until then, use a `go.work` or a `replace`.
+- **Reconfigure the PyPI trusted publisher** for the renamed repository (`lukepuplett/surfdude`). The repository was renamed from `surfdude-csharp` on 2026-11-02, which is what makes the Go module path resolve. The public Go proxy may serve a stale failure for a short while; `GOPROXY=direct GONOSUMDB=github.com/lukepuplett/surfdude` works around it.
 - **Teach the C# client the AgentTrader envelope.** It already has the seam (`IHypertextResourceFormatter`); the shared [fixtures](fixtures/) say what a correct reading looks like.
 - **A small dialect for x402 `402` bodies,** which are not the AgentTrader envelope.
 - **More dialects:** HAL, Siren, and HTML (`a` is a link, `form` is a form).

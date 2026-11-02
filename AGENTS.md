@@ -1,4 +1,4 @@
-# AGENTS.md — Surfdude (`surfdude-csharp` repo)
+# AGENTS.md — Surfdude
 
 Hypermedia API client in three languages (Go, Python, C#) plus shared **fixtures** and **docs**. Journeys follow **`rel`** names, not URLs; **dialects** are pluggable **media type** readers.
 
@@ -68,7 +68,7 @@ Go live journeys may skip if AgentTrader is unreachable from the environment.
 ## Git
 
 - Default branch: **`master`**. User frequently requests push to `origin master` without PR.
-- Remote name may still be `surfdude-csharp`; rename to `surfdude` is a known roadmap item (Go module path already assumes `surfdude`).
+- The GitHub repo was renamed from `surfdude-csharp` to `surfdude` on 2026-11-02. Old URLs redirect. The Go module path (`github.com/lukepuplett/surfdude/go`) matches it, so `go get` works with no `replace`.
 
 ---
 
