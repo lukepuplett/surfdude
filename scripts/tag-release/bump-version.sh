@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Bump the repo-wide semver in VERSION, Python, and .NET. Usage: ./scripts/tag-release/bump-version.sh 0.2.0
+# Bump the semver shared by Go and Python: VERSION and python/pyproject.toml. Usage: ./scripts/tag-release/bump-version.sh 0.2.0
+# The NuGet packages have their own version: use bump-csharp-version.sh.
 set -euo pipefail
 if [ $# -ne 1 ]; then
   echo "Usage: $0 X.Y.Z" >&2
@@ -18,8 +19,6 @@ printf '%s\n' "$new" > VERSION
 
 sed -i.bak "s/^version = \".*\"/version = \"$new\"/" python/pyproject.toml && rm python/pyproject.toml.bak
 
-# -i.bak then rm works on both GNU and macOS sed
-sed -i.bak -e "s|<Version>.*</Version>|<Version>$new</Version>|" -e "s|<PackageVersion>.*</PackageVersion>|<PackageVersion>$new</PackageVersion>|" csharp/Directory.Build.props && rm csharp/Directory.Build.props.bak
 
 echo "Bumped to $new. Run ./scripts/tag-release/check.sh then:"
 echo "  git commit -am \"Release v$new\""

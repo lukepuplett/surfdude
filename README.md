@@ -192,8 +192,8 @@ The C# client targets .NET 8 and .NET 10. It drives APIs that serve the `applica
 Install the client package from your package source:
 
 ```sh
-dotnet add package Surfdude.SimpleJson.Client --version 0.4.0
-dotnet add package Surfdude.AgentTrader.Client --version 0.4.0
+dotnet add package Surfdude.SimpleJson.Client --version 1.1.0
+dotnet add package Surfdude.AgentTrader.Client --version 1.1.0
 ```
 
 `Surfdude.SimpleJson.Client` reads `application/simple-hypertext+json`; `Surfdude.AgentTrader.Client` reads the AgentTrader envelope. Each brings in `Surfdude`.

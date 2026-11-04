@@ -1,6 +1,6 @@
 # Changelog
 
-One version covers Go, Python and .NET. While the major version is 0, a minor release can break the API, and each break is listed first.
+Go and Python share one version. The .NET packages have their own, because they were already on 1.x on nuget.org (`Surfdude` and `Surfdude.SimpleJson.Client` 1.0.3) when the others were on 0.x. While a major version is 0, a minor release can break the API, and each break is listed first.
 
 ## 0.4.0
 
@@ -28,6 +28,10 @@ One version covers Go, Python and .NET. While the major version is 0, a minor re
 ### Fixed
 
 - **C#:** a control's HTTP method was lowercased (`post`, `get`). It is now uppercased.
+
+### .NET packages: 1.1.0, not 0.4.0
+
+The three NuGet packages ship as **1.1.0**: `Surfdude`, `Surfdude.SimpleJson.Client` (both new versions of existing packages) and `Surfdude.AgentTrader.Client` (new). 1.1.0 is a minor bump because the C# API only grows: `IHypertextControl` gains `Method`, `Enctype` and `IfMatch` with defaults that read the old keys, and `SignInHandler` and the AgentTrader package are new. One behaviour changes: on the simple dialect `ControlData` is now empty, because the method and version moved to the new members. Read `Method` and `IfMatch` instead.
 
 ### Upgrading
 

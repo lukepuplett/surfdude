@@ -45,10 +45,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: VERSION matches Python and .NET
+      - name: VERSION matches Python, and the .NET versions agree
         run: |
           set -euo pipefail
           v="$(tr -d '[:space:]' < VERSION)"
           grep -q "^version = \"$v\"" python/pyproject.toml
-          grep -q "<Version>$v</Version>" csharp/Directory.Build.props
-          grep -q "<PackageVersion>$v</PackageVersion>" csharp/Directory.Build.props
+          cv="$(sed -n 's|.*<Version>\(.*\)</Version>.*|\1|p' csharp/Directory.Build.props)"
+          grep -q "<PackageVersion>$cv</PackageVersion>" csharp/Directory.Build.props

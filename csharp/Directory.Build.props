@@ -1,7 +1,8 @@
 <Project>
-  <!-- Kept in sync with /VERSION — see docs/releasing.md and scripts/tag-release/bump-version.sh -->
+  <!-- The NuGet packages have their own version: they were already on 1.x when Go and Python (see /VERSION) were on 0.x.
+       Bump with scripts/tag-release/bump-csharp-version.sh. See docs/releasing.md. -->
   <PropertyGroup>
-    <Version>0.4.0</Version>
-    <PackageVersion>0.4.0</PackageVersion>
+    <Version>1.1.0</Version>
+    <PackageVersion>1.1.0</PackageVersion>
   </PropertyGroup>
 </Project>

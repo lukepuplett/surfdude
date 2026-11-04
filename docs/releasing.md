@@ -1,6 +1,6 @@
 # Releasing Surfdude
 
-One **semver** in [`VERSION`](../VERSION) for Go, Python, and .NET. One **git tag** `vX.Y.Z` triggers [.github/workflows/release.yml](../.github/workflows/release.yml), which publishes **Go** (module tag), **Python** (PyPI), and **`surf`** binaries (GitHub Releases). **NuGet is not automated** in that workflow; build and upload `.nupkg` yourself when ready.
+One **semver** in [`VERSION`](../VERSION) for Go and Python. The **.NET packages have their own version** (see below). One **git tag** `vX.Y.Z` triggers [.github/workflows/release.yml](../.github/workflows/release.yml), which publishes **Go** (module tag), **Python** (PyPI), and **`surf`** binaries (GitHub Releases). **NuGet is not automated** in that workflow; build and upload `.nupkg` yourself when ready.
 
 ## What ships where
 
@@ -21,16 +21,17 @@ The GitHub repo was renamed from `surfdude-csharp` to **`surfdude`** on 2026-11-
 |------|---------|
 | [`VERSION`](../VERSION) | Single line `X.Y.Z` |
 | [`python/pyproject.toml`](../python/pyproject.toml) | `version = "X.Y.Z"` |
-| [`csharp/Directory.Build.props`](../csharp/Directory.Build.props) | `Version` / `PackageVersion` |
+| [`csharp/Directory.Build.props`](../csharp/Directory.Build.props) | The **NuGet** version, `Version` / `PackageVersion`. **Separate from `VERSION`**: the packages were already on 1.x on nuget.org when Go and Python were on 0.x, and NuGet would keep offering the higher number as latest |
 
 Align with:
 
 ```sh
-./scripts/tag-release/bump-version.sh 0.2.0
+./scripts/tag-release/bump-version.sh 0.2.0          # Go and Python
+./scripts/tag-release/bump-csharp-version.sh 1.1.0   # NuGet packages
 ./scripts/tag-release/check.sh
 ```
 
-`check.sh` runs Go, Python, and .NET tests and checks that the three version fields match `VERSION`.
+`check.sh` runs Go, Python, and .NET tests, checks that `python/pyproject.toml` matches `VERSION`, and checks that the two .NET version fields agree.
 
 Local artifacts (no publish):
 
@@ -46,7 +47,7 @@ Outputs under `/tmp/surfdude-release/` (`.nupkg`, wheels, local `surf` binary).
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| [.github/workflows/ci.yml](../.github/workflows/ci.yml) | Push / PR to **`master`** | Tests + `VERSION` consistency |
+| [.github/workflows/ci.yml](../.github/workflows/ci.yml) | Push / PR to **`master`** | Tests + version consistency (`VERSION` and Python agree; the .NET fields agree) |
 | [.github/workflows/release.yml](../.github/workflows/release.yml) | Push tag **`v*.*.*`** | Tests again, then publish Go / PyPI / GitHub Release |
 | [`azure-pipelines.yaml`](../azure-pipelines.yaml) | Azure DevOps | **CI only** (build + test). No NuGet push on every build. |
 
@@ -168,7 +169,7 @@ Download from [GitHub Releases](https://github.com/lukepuplett/surfdude/releases
 
 ## .NET / NuGet (manual)
 
-The Release workflow **does not** pack or push NuGet packages. Reasons in practice: separate Microsoft account / API key flow; packages can ship on a different cadence than Go/Python.
+The Release workflow **does not** pack or push NuGet packages. Reasons in practice: separate Microsoft account / API key flow; packages can ship on a different cadence than Go/Python. They also have their own version number: nuget.org already had `Surfdude` and `Surfdude.SimpleJson.Client` at 1.0.3, so a 0.x upload would be listed as older and NuGet would keep offering 1.0.3. Uploads cannot be deleted, only unlisted, so check the number before you push.
 
 Build packages locally:
 
@@ -181,7 +182,7 @@ dotnet pack csharp/Evoq.Surfdude.sln -c Release -o ./artifacts/nupkg
 Upload **`Surfdude.*.nupkg`**, **`Surfdude.SimpleJson.Client.*.nupkg`** and **`Surfdude.AgentTrader.Client.*.nupkg`** (not the console app unless you intend to publish it):
 
 ```sh
-dotnet nuget push ./artifacts/nupkg/Surfdude.0.1.0.nupkg \
+dotnet nuget push ./artifacts/nupkg/Surfdude.1.1.0.nupkg \
   --api-key YOUR_KEY --source https://api.nuget.org/v3/index.json
 ```
 
@@ -191,13 +192,13 @@ To automate NuGet later, add a pack/push step back to `release.yml` and secret *
 
 ## What consumers run
 
-Replace **`0.1.0`** with the version you shipped.
+Replace **`0.1.0`** with the Go or Python version you shipped (the .NET row uses its own version).
 
 | Ecosystem | Library | CLI |
 |-----------|---------|-----|
 | **Go** | `go get github.com/lukepuplett/surfdude/go/surf@v0.1.0` | `go install github.com/lukepuplett/surfdude/go/cmd/surf@v0.1.0` or GitHub Release **`surf`** |
 | **Python** | `uv add surfdude==0.1.0` or `pip install surfdude==0.1.0` | Go **`surf`** or Release binary (no PyPI CLI yet) |
-| **.NET** | `dotnet add package Surfdude --version 0.4.0`, `Surfdude.SimpleJson.Client` and `Surfdude.AgentTrader.Client` | No global tool yet |
+| **.NET** | `dotnet add package Surfdude --version 1.1.0`, `Surfdude.SimpleJson.Client` and `Surfdude.AgentTrader.Client` (use the .NET version, not `VERSION`) | No global tool yet |
 
 ---
 

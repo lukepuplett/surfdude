@@ -31,7 +31,7 @@ dotnet pack src/Evoq.Surfdude/Evoq.Surfdude.csproj -c Release
 dotnet pack src/Evoq.Surfdude.SimpleJson/Evoq.Surfdude.SimpleJson.csproj -c Release
 ```
 
-Package ids on NuGet: **`Surfdude`**, **`Surfdude.SimpleJson.Client`**, **`Surfdude.AgentTrader.Client`**. Version tracks repo [`VERSION`](../VERSION) via [`Directory.Build.props`](Directory.Build.props). **GitHub tag releases do not push to NuGet** — build with [`../scripts/tag-release/build-local.sh`](../scripts/tag-release/build-local.sh) or `dotnet pack`, then upload manually. See [../docs/releasing.md#net--nuget-manual](../docs/releasing.md#net--nuget-manual). Legacy script: [build/Publish-ToNuGet.ps1](build/Publish-ToNuGet.ps1).
+Package ids on NuGet: **`Surfdude`**, **`Surfdude.SimpleJson.Client`**, **`Surfdude.AgentTrader.Client`**. The NuGet version is set in [`Directory.Build.props`](Directory.Build.props) and is separate from the repo [`VERSION`](../VERSION) (Go and Python): the packages were already on 1.x. **GitHub tag releases do not push to NuGet** — build with [`../scripts/tag-release/build-local.sh`](../scripts/tag-release/build-local.sh) or `dotnet pack`, then upload manually. See [../docs/releasing.md#net--nuget-manual](../docs/releasing.md#net--nuget-manual). Legacy script: [build/Publish-ToNuGet.ps1](build/Publish-ToNuGet.ps1).
 
 ## Layout
 
