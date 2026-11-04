@@ -68,7 +68,7 @@ You can download a pre-built binary for Linux, macOS, or Windows from the [GitHu
 Alternatively, if you have Go installed on your system, you can install the executable directly into your Go bin directory:
 
 ```sh
-go install github.com/lukepuplett/surfdude/go/cmd/surf@v0.2.0
+go install github.com/lukepuplett/surfdude/go/cmd/surf@v0.4.0
 ```
 
 #### Basic usage
@@ -94,13 +94,13 @@ The Python library lets you write automated journeys using a fluent wave builder
 Install the package from PyPI into your environment:
 
 ```sh
-pip install surfdude==0.1.0
+pip install surfdude==0.4.0
 ```
 
 If you use `uv`, add the package to your project:
 
 ```sh
-uv add surfdude==0.1.0
+uv add surfdude==0.4.0
 ```
 
 #### First journey
@@ -138,7 +138,7 @@ The Go module provides the core hypermedia engine and pluggable dialect readers.
 Add the Go module to your project:
 
 ```sh
-go get github.com/lukepuplett/surfdude/go/surf@v0.2.0
+go get github.com/lukepuplett/surfdude/go/surf@v0.4.0
 ```
 
 #### First journey
@@ -192,8 +192,11 @@ The C# client targets .NET 8 and .NET 10. It drives APIs that serve the `applica
 Install the client package from your package source:
 
 ```sh
-dotnet add package Surfdude.SimpleJson.Client --version 0.1.0
+dotnet add package Surfdude.SimpleJson.Client --version 0.4.0
+dotnet add package Surfdude.AgentTrader.Client --version 0.4.0
 ```
+
+`Surfdude.SimpleJson.Client` reads `application/simple-hypertext+json`; `Surfdude.AgentTrader.Client` reads the AgentTrader envelope. Each brings in `Surfdude`.
 
 For manual build and package upload instructions, see [docs/releasing.md#net--nuget-manual](docs/releasing.md#net--nuget-manual).
 
@@ -279,10 +282,39 @@ await surfer.Wave(c => c.ExpectedStatusCodes = new[] { 200, 404 })
 
 The Go client is new (November 2026): two dialects, an explorer, a command-line tool and first journeys against AgentTrader. The C# client is the original. It now has a reusable `Surfer`, its first unit tests in [csharp/tests/Evoq.Surfdude.Tests](csharp/tests/Evoq.Surfdude.Tests), and targets **.NET 8** and **.NET 10** (apps and tests on **.NET 10** LTS).
 
+### Where the three clients match, and where they do not
+
+Both dialects are available in all three languages:
+
+| | simple | agenttrader |
+|---|---|---|
+| Go | in the module | in the module |
+| Python | in the wheel | in the wheel |
+| C# | `Surfdude.SimpleJson.Client` | `Surfdude.AgentTrader.Client` |
+
+The features are not at parity:
+
+| Feature | Go | Python | C# |
+|---|---|---|---|
+| Sign in again on a 401 | yes | yes | yes, as a `SignInHandler` in the `HttpClient` pipeline (no `Surfer.WithSignIn`) |
+| Extensions bag (`Extensions`, `extensions`, `ControlData`) | yes | yes | yes |
+| Retry | opt-in policy | opt-in policy | none in the library; use Polly or similar |
+| Explore (crawler) and the `surf` command | yes | no | no |
+| `surftest.Golden` (recorded samples) | yes | no | no |
+| A response no dialect can read stays safe to inspect | yes | not yet checked | not yet checked |
+| Status, notes, paging and problems on a resource | yes | yes | no: the C# model cannot hold them |
+| Schema checks (`enum`, `minimum`, `pattern`, `format`) | yes | yes | only the field `type` |
+| URI template expansion in AgentTrader hrefs | yes | yes | no |
+| Shared conformance fixtures | all cases | all cases | AgentTrader controls only; the simple fixtures are not run |
+| Live journeys against AgentTrader | yes (some skip) | no | no |
+| Async client | n/a | sync only | n/a |
+| 402 handling and the x402 parser | none | none | none |
+
+Gaps are tracked in [tmp/gap-tracking.md](tmp/gap-tracking.md); release notes are in [CHANGELOG.md](CHANGELOG.md).
+
 - **GitHub Actions CI** on **`master`** (Go, Python, C#) — see [docs/releasing.md](docs/releasing.md).
 - **Tag releases** **`vX.Y.Z`**: Go module tag **`go/v…`**, PyPI via **trusted publisher**, **`surf`** on GitHub Releases; **NuGet** is manual for now.
 - **Reconfigure the PyPI trusted publisher** for the renamed repository (`lukepuplett/surfdude`). The repository was renamed from `surfdude-csharp` on 2026-11-02, which is what makes the Go module path resolve. The public Go proxy may serve a stale failure for a short while; `GOPROXY=direct GONOSUMDB=github.com/lukepuplett/surfdude` works around it.
-- **Teach the C# client the AgentTrader envelope.** It already has the seam (`IHypertextResourceFormatter`); the shared [fixtures](fixtures/) say what a correct reading looks like.
 - **A small dialect for x402 `402` bodies,** which are not the AgentTrader envelope.
 - **More dialects:** HAL, Siren, and HTML (`a` is a link, `form` is a form).
 - **The C# model** is thinner than the Go one: inputs have a name and an optional flag, with no schema. It can grow to match [docs/model.md](docs/model.md).

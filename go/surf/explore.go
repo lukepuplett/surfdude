@@ -142,8 +142,8 @@ func (s *Surfer) skipReason(c hypertext.Control) string {
 	switch {
 	case c.HTTPMethod() != "GET":
 		return "changes state, not followed"
-	case len(c.Requires) > 0 && s.bearer() == "":
-		return "needs " + strings.Join(c.Requires, ", ") + " and no token was given"
+	case len(requires(c)) > 0 && s.bearer() == "":
+		return "needs " + strings.Join(requires(c), ", ") + " and no token was given"
 	case len(c.RequiredInputs()) > 0:
 		names := make([]string, 0)
 		for _, in := range c.RequiredInputs() {
@@ -152,10 +152,24 @@ func (s *Surfer) skipReason(c hypertext.Control) string {
 		return "needs values for " + strings.Join(names, ", ")
 	case strings.Contains(c.Href, "{") && strings.Contains(c.Href, "}") && !strings.Contains(c.Href, "{?"):
 		return "has a path template with no value"
-	case c.Type != "" && !strings.Contains(c.Type, "json"):
-		return "serves " + c.Type + ", not hypermedia"
+	case mediaType(c) != "" && !strings.Contains(mediaType(c), "json"):
+		return "serves " + mediaType(c) + ", not hypermedia"
 	}
 	return ""
+}
+
+// requires and mediaType read two extensions the crawler uses to decide what to skip. They are
+// conventions of the dialects that send them, not part of the model, and the surfer ignores them.
+func requires(c hypertext.Control) []string {
+	var names []string
+	_, _ = c.DecodeExtension("requires", &names)
+	return names
+}
+
+func mediaType(c hypertext.Control) string {
+	var mt string
+	_, _ = c.DecodeExtension("type", &mt)
+	return mt
 }
 
 // checkControl reports a control that is malformed or uses a rel the registry does not know.

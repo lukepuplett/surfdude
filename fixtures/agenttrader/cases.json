@@ -27,9 +27,11 @@
           "new-listing": {
             "form": false,
             "method": "GET",
-            "requires": [
-              "agent-session"
-            ]
+            "extensions": {
+              "requires": [
+                "agent-session"
+              ]
+            }
           },
           "search-listings": {
             "form": true,
@@ -123,11 +125,13 @@
                   "note"
                 ],
                 "required": [],
-                "requires": [
-                  "agent-session"
-                ],
                 "inputValues": {
                   "listingId": "lst_seed01"
+                },
+                "extensions": {
+                  "requires": [
+                    "agent-session"
+                  ]
                 }
               },
               "message-seller": {
@@ -139,9 +143,11 @@
                 "required": [
                   "body"
                 ],
-                "requires": [
-                  "agent-session"
-                ]
+                "extensions": {
+                  "requires": [
+                    "agent-session"
+                  ]
+                }
               }
             }
           }
@@ -172,12 +178,14 @@
               "askingPriceGbp"
             ],
             "required": [],
-            "requires": [
-              "agent-session"
-            ],
             "ifMatch": "v3",
             "inputValues": {
               "askingPriceGbp": 3000
+            },
+            "extensions": {
+              "requires": [
+                "agent-session"
+              ]
             }
           },
           "human-page": {

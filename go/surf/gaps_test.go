@@ -82,12 +82,15 @@ func gapHomeDuplicateRel() map[string]any {
 	}
 }
 
-// GAP-01: Follow a control with requires agent-session without a token must not hit the server.
-func TestGAP01_RequiresPreflightBeforeHTTP(t *testing.T) {
+// GAP-01: a control that says it requires a session is followed like any other. Nothing in the
+// surfer reads `requires`; the server's 401 is what says a session is needed.
+func TestGAP01_RequiresIsNotActedOn_TheServersAnswerDecides(t *testing.T) {
 	var secretHits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/secret" {
 			secretHits.Add(1)
+			writeGapJSON(w, 401, map[string]any{"status": 401, "message": "Sign in", "notes": []string{"missing: agent-session"}, "data": []any{}})
+			return
 		}
 		writeGapJSON(w, 200, gapHomeWithSecret())
 	}))
@@ -99,23 +102,25 @@ func TestGAP01_RequiresPreflightBeforeHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = home.Follow(context.Background(), "secret")
-	if err == nil {
-		t.Fatal("want an error before or instead of an unauthenticated GET /secret")
+
+	var refused *hypertext.UnexpectedStatusError
+	if !errors.As(err, &refused) || refused.Status != 401 {
+		t.Fatalf("err = %v, want the server's 401 as *UnexpectedStatusError", err)
 	}
-	if !strings.Contains(err.Error(), "agent-session") {
-		t.Fatalf("err = %v, want it to name agent-session", err)
-	}
-	if secretHits.Load() != 0 {
-		t.Fatalf("GET /secret was called %d times; want preflight without HTTP", secretHits.Load())
+	if secretHits.Load() != 1 {
+		t.Fatalf("GET /secret was called %d times; want the request sent once", secretHits.Load())
 	}
 }
 
-// GAP-02: Submit on a control with price must fail before POST.
-func TestGAP02_PricePreflightBeforePOST(t *testing.T) {
+// GAP-02: a control with a price is sent. A 402 from the server, not a field on the control, is what
+// says payment is needed, because only the 402 carries the terms of that moment.
+func TestGAP02_PriceIsNotActedOn_TheServersAnswerDecides(t *testing.T) {
 	var postHits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && r.URL.Path == "/paid" {
 			postHits.Add(1)
+			writeGapJSON(w, 402, map[string]any{"status": 402, "message": "Payment required", "data": []any{}})
+			return
 		}
 		writeGapJSON(w, 200, gapHomeWithPaidAction())
 	}))
@@ -124,19 +129,19 @@ func TestGAP02_PricePreflightBeforePOST(t *testing.T) {
 	s, _ := surf.New(srv.URL, surf.WithDialects(agenttrader.New()))
 	home, _ := s.Root(context.Background())
 	_, err := home.Submit(context.Background(), "buy", surf.Values{"sku": "x"})
-	if err == nil {
-		t.Fatal("want an error about payment before POST")
+
+	var refused *hypertext.UnexpectedStatusError
+	if !errors.As(err, &refused) || refused.Status != 402 {
+		t.Fatalf("err = %v, want the server's 402 as *UnexpectedStatusError", err)
 	}
-	if !strings.Contains(strings.ToLower(err.Error()), "pay") {
-		t.Fatalf("err = %v, want payment called out", err)
-	}
-	if postHits.Load() != 0 {
-		t.Fatalf("POST /paid was called; want preflight")
+	if postHits.Load() != 1 {
+		t.Fatalf("POST /paid was called %d times; want the request sent once", postHits.Load())
 	}
 }
 
-// GAP-03: Follow on a link whose type is not hypermedia must fail before GET.
-func TestGAP03_NonHypermediaTypePreflight(t *testing.T) {
+// GAP-03: a link's `type` is an extension too. Following it sends the request, and a response no
+// dialect can read is reported as such.
+func TestGAP03_TypeIsNotActedOn_AnUnreadableAnswerIsReported(t *testing.T) {
 	var htmlHits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/human" {
@@ -152,11 +157,13 @@ func TestGAP03_NonHypermediaTypePreflight(t *testing.T) {
 	s, _ := surf.New(srv.URL, surf.WithDialects(agenttrader.New()))
 	home, _ := s.Root(context.Background())
 	_, err := home.Follow(context.Background(), "human-page")
-	if err == nil {
-		t.Fatal("want an error before fetching non-hypermedia")
+
+	var unsupported *hypertext.UnsupportedMediaTypeError
+	if !errors.As(err, &unsupported) {
+		t.Fatalf("err = %v, want *UnsupportedMediaTypeError", err)
 	}
-	if htmlHits.Load() != 0 {
-		t.Fatalf("GET /human was called; want preflight")
+	if htmlHits.Load() != 1 {
+		t.Fatalf("GET /human was called %d times; want once", htmlHits.Load())
 	}
 }
 
@@ -294,9 +301,9 @@ func TestGAP10_DuplicateRelReported(t *testing.T) {
 	}
 }
 
-// A control that needs a session and also has a missing required field must report the session
-// first, because that is the blocker the caller can act on.
-func TestPreflightRunsBeforeInputValidation(t *testing.T) {
+// A control that says it requires a session and also has a missing required field reports the
+// missing field: nothing reads `requires` before the request.
+func TestMissingField_IsReportedEvenWhenTheControlSaysItRequiresASession(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeGapJSON(w, 200, map[string]any{
 			"status": 200, "message": "OK", "data": []any{},
@@ -317,8 +324,8 @@ func TestPreflightRunsBeforeInputValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = home.Submit(context.Background(), "shortlist", surf.Values{})
-	var needs *hypertext.RequiresNotMetError
-	if !errors.As(err, &needs) {
-		t.Fatalf("err = %v, want RequiresNotMetError before the missing-field error", err)
+	var missing *hypertext.MissingInputError
+	if !errors.As(err, &missing) {
+		t.Fatalf("err = %v, want *MissingInputError", err)
 	}
 }

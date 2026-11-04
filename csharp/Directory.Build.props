@@ -1,7 +1,7 @@
 <Project>
   <!-- Kept in sync with /VERSION — see docs/releasing.md and scripts/tag-release/bump-version.sh -->
   <PropertyGroup>
-    <Version>0.2.0</Version>
-    <PackageVersion>0.2.0</PackageVersion>
+    <Version>0.4.0</Version>
+    <PackageVersion>0.4.0</PackageVersion>
   </PropertyGroup>
 </Project>

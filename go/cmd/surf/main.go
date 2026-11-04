@@ -102,8 +102,9 @@ func printControls(indent string, controls []hypertext.Control) {
 			kind = "form  "
 		}
 		line := fmt.Sprintf("%s  %s %-6s %-22s %s", indent, kind, c.HTTPMethod(), c.Rel, c.Href)
-		if len(c.Requires) > 0 {
-			line += "  [needs " + strings.Join(c.Requires, ", ") + "]"
+		var requires []string
+		if _, err := c.DecodeExtension("requires", &requires); err == nil && len(requires) > 0 {
+			line += "  [needs " + strings.Join(requires, ", ") + "]"
 		}
 		fmt.Println(line)
 		for _, in := range c.Inputs {

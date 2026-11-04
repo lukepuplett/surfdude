@@ -9,7 +9,7 @@ One **semver** in [`VERSION`](../VERSION) for Go, Python, and .NET. One **git ta
 | **Go module** `github.com/lukepuplett/surfdude/go` | Tag **`go/vX.Y.Z`** on the same commit as **`vX.Y.Z`** | Public git tags on this repo |
 | **Python** [`surfdude`](https://pypi.org/project/surfdude/) on PyPI | `uv publish` in Release workflow | **Trusted publisher** (GitHub OIDC) — no PyPI API token in secrets |
 | **`surf` CLI** (linux / darwin / windows) | [GoReleaser](../.goreleaser.yaml) → GitHub Release for **`vX.Y.Z`** | `GITHUB_TOKEN` in Actions (automatic) |
-| **.NET** packages `Surfdude`, `Surfdude.SimpleJson.Client` | Manual (or local `dotnet nuget push`) | [nuget.org](https://www.nuget.org) API key on your machine |
+| **.NET** packages `Surfdude`, `Surfdude.SimpleJson.Client`, `Surfdude.AgentTrader.Client` | Manual (or local `dotnet nuget push`) | [nuget.org](https://www.nuget.org) API key on your machine |
 
 The GitHub repo was renamed from `surfdude-csharp` to **`surfdude`** on 2026-11-02 (old URLs redirect). The Go module path in [`go/go.mod`](../go/go.mod) uses **`surfdude`** and now resolves.
 
@@ -162,6 +162,10 @@ Download from [GitHub Releases](https://github.com/lukepuplett/surfdude/releases
 
 ---
 
+## Release notes
+
+[CHANGELOG.md](../CHANGELOG.md) holds the notes for every release. Add the new version's section before you bump and tag, and paste it into the GitHub release.
+
 ## .NET / NuGet (manual)
 
 The Release workflow **does not** pack or push NuGet packages. Reasons in practice: separate Microsoft account / API key flow; packages can ship on a different cadence than Go/Python.
@@ -174,7 +178,7 @@ Build packages locally:
 dotnet pack csharp/Evoq.Surfdude.sln -c Release -o ./artifacts/nupkg
 ```
 
-Upload **`Surfdude.*.nupkg`** and **`Surfdude.SimpleJson.Client.*.nupkg`** (not the console app unless you intend to publish it):
+Upload **`Surfdude.*.nupkg`**, **`Surfdude.SimpleJson.Client.*.nupkg`** and **`Surfdude.AgentTrader.Client.*.nupkg`** (not the console app unless you intend to publish it):
 
 ```sh
 dotnet nuget push ./artifacts/nupkg/Surfdude.0.1.0.nupkg \
@@ -193,7 +197,7 @@ Replace **`0.1.0`** with the version you shipped.
 |-----------|---------|-----|
 | **Go** | `go get github.com/lukepuplett/surfdude/go/surf@v0.1.0` | `go install github.com/lukepuplett/surfdude/go/cmd/surf@v0.1.0` or GitHub Release **`surf`** |
 | **Python** | `uv add surfdude==0.1.0` or `pip install surfdude==0.1.0` | Go **`surf`** or Release binary (no PyPI CLI yet) |
-| **.NET** | `dotnet add package Surfdude --version 0.1.0` and `Surfdude.SimpleJson.Client` | No global tool yet |
+| **.NET** | `dotnet add package Surfdude --version 0.4.0`, `Surfdude.SimpleJson.Client` and `Surfdude.AgentTrader.Client` | No global tool yet |
 
 ---
 

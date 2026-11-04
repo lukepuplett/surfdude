@@ -1,9 +1,11 @@
 // Package agenttrader reads the AgentTrader response envelope:
 //
 //	{"status":200,"message":"OK","notes":[...],"data":[...],"paging":{...},
-//	 "_links":[{"rel","href","method","title","type","requires"}],
-//	 "_actions":[{"rel","title","action","method","enctype","price","requires","ifMatch",
-//	              "fields":[{"name","required","value","schema"}]}]}
+//	 "_links":[{"rel","href","method", ...}],
+//	 "_actions":[{"rel","action","method","enctype","ifMatch",
+//	              "fields":[{"name","required","value","schema"}], ...}]}
+//
+// Any other key on a link or action (title, type, requires, price) is kept as an extension.
 //
 // Items in data can carry their own _links, _actions and notes. Every response names the envelope
 // in a Link header (rel="profile"), which is how the dialect recognises it without sniffing.
@@ -72,29 +74,73 @@ type controls struct {
 	Notes   []string `json:"notes"`
 }
 
+// link and action keep the parts of a control that change the request. Every other key the server
+// sent on them is kept as an extension, as the server sent it.
 type link struct {
-	Rel      string   `json:"rel"`
-	Href     string   `json:"href"`
-	Method   string   `json:"method"`
-	Title    string   `json:"title"`
-	Type     string   `json:"type"`
-	Requires []string `json:"requires"`
+	Rel    string
+	Href   string
+	Method string
+	extra  map[string]json.RawMessage
+}
+
+func (l *link) UnmarshalJSON(b []byte) error {
+	var core struct {
+		Rel    string `json:"rel"`
+		Href   string `json:"href"`
+		Method string `json:"method"`
+	}
+	if err := json.Unmarshal(b, &core); err != nil {
+		return err
+	}
+	l.Rel, l.Href, l.Method = core.Rel, core.Href, core.Method
+
+	var err error
+	l.extra, err = extras(b, "rel", "href", "method")
+	return err
 }
 
 type action struct {
-	Rel      string   `json:"rel"`
-	Title    string   `json:"title"`
-	Action   string   `json:"action"`
-	Method   string   `json:"method"`
-	Enctype  string   `json:"enctype"`
-	Requires []string `json:"requires"`
-	IfMatch  string   `json:"ifMatch"`
-	Price    *struct {
-		Amount   string `json:"amount"`
-		Currency string `json:"currency"`
-		Note     string `json:"note"`
-	} `json:"price"`
-	Fields []field `json:"fields"`
+	Rel     string
+	Action  string
+	Method  string
+	Enctype string
+	IfMatch string
+	Fields  []field
+	extra   map[string]json.RawMessage
+}
+
+func (a *action) UnmarshalJSON(b []byte) error {
+	var core struct {
+		Rel     string  `json:"rel"`
+		Action  string  `json:"action"`
+		Method  string  `json:"method"`
+		Enctype string  `json:"enctype"`
+		IfMatch string  `json:"ifMatch"`
+		Fields  []field `json:"fields"`
+	}
+	if err := json.Unmarshal(b, &core); err != nil {
+		return err
+	}
+	a.Rel, a.Action, a.Method, a.Enctype, a.IfMatch, a.Fields = core.Rel, core.Action, core.Method, core.Enctype, core.IfMatch, core.Fields
+
+	var err error
+	a.extra, err = extras(b, "rel", "action", "method", "enctype", "ifMatch", "fields")
+	return err
+}
+
+// extras returns every key of the JSON object except the ones the model has a field for.
+func extras(b []byte, core ...string) (map[string]json.RawMessage, error) {
+	var all map[string]json.RawMessage
+	if err := json.Unmarshal(b, &all); err != nil {
+		return nil, err
+	}
+	for _, k := range core {
+		delete(all, k)
+	}
+	if len(all) == 0 {
+		return nil, nil
+	}
+	return all, nil
 }
 
 type field struct {
@@ -147,15 +193,12 @@ func (Dialect) Read(resp *http.Response, body []byte) (*hypertext.Resource, erro
 func toControls(links []link, actions []action) []hypertext.Control {
 	out := make([]hypertext.Control, 0, len(links)+len(actions))
 	for _, l := range links {
-		out = append(out, hypertext.Control{Rel: l.Rel, Title: l.Title, Href: l.Href, Method: l.Method, Type: l.Type, Requires: l.Requires})
+		out = append(out, hypertext.Control{Rel: l.Rel, Href: l.Href, Method: l.Method, Extensions: l.extra})
 	}
 	for _, a := range actions {
 		c := hypertext.Control{
-			Rel: a.Rel, Title: a.Title, Href: a.Action, Method: a.Method, Enctype: a.Enctype,
-			Form: true, Requires: a.Requires, IfMatch: a.IfMatch,
-		}
-		if a.Price != nil {
-			c.Price = &hypertext.Price{Amount: a.Price.Amount, Currency: a.Price.Currency, Note: a.Price.Note}
+			Rel: a.Rel, Href: a.Action, Method: a.Method, Enctype: a.Enctype,
+			Form: true, IfMatch: a.IfMatch, Extensions: a.extra,
 		}
 		for _, f := range a.Fields {
 			c.Inputs = append(c.Inputs, hypertext.Input{Name: f.Name, Required: f.Required, Value: f.Value, Schema: f.Schema})

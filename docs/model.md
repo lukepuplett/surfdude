@@ -22,16 +22,34 @@ Something to follow or submit, found by its **rel** (its relation name). A rel i
 
 | Part | Meaning |
 |------|---------|
-| Rel, Title | What it is for |
+| Rel | What it is for |
 | Href | Where it goes. Relative addresses resolve against the page they came from |
 | Method | The HTTP method. Empty means GET |
 | Enctype | The media type of the body to send. Empty means the dialect's default |
 | Form | True for a form that carries inputs, false for a plain link |
 | Inputs | The form's fields |
-| Requires | What the caller needs first, for example `agent-session` |
 | IfMatch | The version it expects, sent as the `If-Match` header |
-| Price | A payment the control needs (optional) |
-| Type | The media type it serves, when it is not hypermedia. A crawler skips these |
+| Extensions | Everything else the dialect found on the control, kept under the dialect's own name with the server's value as sent. The surfer never reads them. See [Core parts and extras](#core-parts-and-extras) |
+
+### Core parts and extras
+
+A part is **core** only if it changes the request the client builds or how the control is found. Everything else a dialect finds on a control is an **extra**: it goes in the control's bag, keyed by the dialect's own name, with the server's value kept as it was sent, and the core never reads it.
+
+| Core (has its own member) | Extras (in the bag) |
+|---------------------------|---------------------|
+| Rel, Href, Method, Enctype, Inputs (with their value and schema), IfMatch | Anything else a dialect sends, for example `requires`, `price`, `type`, `title` |
+
+Why `requires` and `price` are extras: a 401 tells the client a session is needed, and a 402 gives the payment terms of that moment, so neither has to be declared on the control to work. A price on a control would also be stale by the time it is used. The surfer therefore sends a control that says it requires a session or has a price like any other, and the server's answer decides what happens next. A client that wants to look before it sends can read the extension itself.
+
+**How each language spells it:**
+
+| Language | The extras | Read one |
+|----------|------------|----------|
+| Go | `Control.Extensions` (`map[string]json.RawMessage`) | `c.Extension(name)`, `c.DecodeExtension(name, &out)` |
+| Python | `Control.extensions` (`dict`, decoded JSON) | `c.extensions["requires"]` |
+| C# | `IHypertextControl.ControlData` (key and JSON text); `Method`, `Enctype` and `IfMatch` are members | `control.ControlData` |
+
+Go and Python used to have `Requires`, `Price`, `Type` and `Title` as fields, and a preflight that refused a control before sending when it needed a session, had a price or served non-JSON. That is gone (v0.3.0). The crawler (`Explore`) and the `surf` command still read the `requires` and `type` extensions to decide what to skip and what to show, because they are tools and not the request path.
 
 ## Input
 
@@ -115,7 +133,7 @@ Previous steps do not “call forward” into server memory that the client cann
 
 This is **stateless at the contract**:
 
-- Each submit can be built from **one control** plus merge (prefill + your values) plus headers the control declares (`If-Match`, bearer for `requires`).
+- Each submit can be built from **one control** plus merge (prefill + your values) plus headers the control declares (`If-Match`). A bearer token is added when the surfer holds one.
 - The client never names URLs or methods; it never parses an old URL for hidden fields.
 
 It is **not** “the server has no database.” A draft id or session token in **`value`** is explicit. The client stays dumb; the server may still store state behind that token.
@@ -140,7 +158,7 @@ It is **not** “the server has no database.” A draft id or session token in *
 | **`ThenItem`** | Switches to one list member’s controls so the next submit uses **that row’s** prefilled ids. |
 | **Merge (prefill + submit map)** | Server **`value`** first, caller overrides; required checks use “required and no prefill.” Go/Python in `merge`; C# in `BuildRequest` via `MergeSendPairs`. |
 | **`Follow` with empty values** | Sends a GET (or POST with only prefills) when the control needs nothing new from the caller. |
-| **`If-Match` / `requires`** | Version and auth declared on the control, not invented by the client. |
+| **`If-Match`** | Version declared on the control, not invented by the client. A session is not declared: the server's 401 asks for it. |
 | **Fixtures / conformance** | Shared examples of prefilled fields and item actions so all implementations merge the same way. |
 
 A minimal journal-shaped ride (search → pick item → submit only the new field):

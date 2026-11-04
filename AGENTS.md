@@ -12,7 +12,7 @@ Hypermedia API client in three languages (Go, Python, C#) plus shared **fixtures
 |-----|--------|
 | **Dialect** | Client plugin: `Accept`, `Matches`, `Read` for one hypermedia spelling (= **media type** in HTTP/API design). |
 | **simple** | `application/simple-hypertext+json` — C# package `Evoq.Surfdude.SimpleJson`. |
-| **agenttrader** | AgentTrader JSON envelope + profile — Go/Python only today. |
+| **agenttrader** | AgentTrader JSON envelope + profile — Go, Python, and C# (`Evoq.Surfdude.AgentTrader`, controls only). |
 | **Wave / journey** | Fluent chain of steps (`FromRoot`, `Then`, `ThenSubmit`, `Go`). |
 | **Fixture** | Shared JSON under `fixtures/<dialect>/` + `cases.json` conformance. |
 

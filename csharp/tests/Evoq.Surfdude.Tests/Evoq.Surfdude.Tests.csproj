@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Evoq.Surfdude\Evoq.Surfdude.csproj" />
     <ProjectReference Include="..\..\src\Evoq.Surfdude.SimpleJson\Evoq.Surfdude.SimpleJson.csproj" />
+    <ProjectReference Include="..\..\src\Evoq.Surfdude.AgentTrader\Evoq.Surfdude.AgentTrader.csproj" />
   </ItemGroup>
 
 </Project>

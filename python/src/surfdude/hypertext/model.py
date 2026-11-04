@@ -16,25 +16,23 @@ class Input:
 
 
 @dataclass
-class Price:
-    amount: str = ""
-    currency: str = ""
-    note: str = ""
-
-
-@dataclass
 class Control:
+    """Something to follow or submit, found by ``rel``.
+
+    Only what changes the request, or how the control is found, has a field: ``rel``, ``href``,
+    ``method``, ``enctype``, ``inputs`` and ``if_match``. Anything else a dialect finds on a control,
+    such as what it requires or what it costs, is an extension: kept under the dialect's own name,
+    with the server's value as it was sent. The surfer never reads extensions.
+    """
+
     rel: str
-    title: str = ""
     href: str = ""
     method: str = ""
     enctype: str = ""
-    type: str = ""
     form: bool = False
     inputs: list[Input] = field(default_factory=list)
-    requires: list[str] = field(default_factory=list)
     if_match: str = ""
-    price: Price | None = None
+    extensions: dict[str, Any] = field(default_factory=dict)
 
     def http_method(self) -> str:
         return (self.method or "GET").upper()

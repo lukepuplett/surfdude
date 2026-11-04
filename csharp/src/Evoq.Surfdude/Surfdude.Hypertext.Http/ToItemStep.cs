@@ -39,7 +39,7 @@
                 var firstRequiredInput = itemControl.Inputs?.FirstOrDefault(i => !i.IsOptional);
                 if (firstRequiredInput == null)
                 {
-                    return this.StepContext.HttpClient.GetAsync(itemControl.HRef, cancellationToken);
+                    return this.GetAsync(itemControl.HRef, cancellationToken);
                 }
                 else
                 {

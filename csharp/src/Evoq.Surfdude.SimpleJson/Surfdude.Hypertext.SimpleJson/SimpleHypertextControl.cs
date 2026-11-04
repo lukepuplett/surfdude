@@ -18,11 +18,8 @@
 
         public IEnumerable<IHypertextInputControl> Inputs => this.Form;
 
-        public IEnumerable<KeyValuePair<string, string>> ControlData => new []
-        {
-            new KeyValuePair<string, string>(HttpControlData.MethodControlName, this.Method),
-            new KeyValuePair<string, string>(HttpControlData.IfMatchControlName, this.IfMatch)
-        };
+        // The simple dialect has no extra parts: its method and if-match are the members above.
+        public IEnumerable<KeyValuePair<string, string>> ControlData => System.Array.Empty<KeyValuePair<string, string>>();
 
         public bool RequiresInput => this.Inputs?.Any(i => !i.IsOptional) ?? false;
     }

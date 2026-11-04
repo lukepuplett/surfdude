@@ -95,8 +95,11 @@ def _check_control(rel: str, c: Control, w: dict[str, Any]) -> None:
         names = [inp.name for inp in c.inputs if inp.required and inp.value is None]
         if names != w["required"]:
             raise AssertionError(f"{rel}: required = {names}, want {w['required']}")
-    if w.get("requires") is not None and c.requires != w["requires"]:
-        raise AssertionError(f"{rel}: requires = {c.requires}, want {w['requires']}")
+    for name, want in (w.get("extensions") or {}).items():
+        if name not in c.extensions or c.extensions[name] != want:
+            raise AssertionError(
+                f"{rel}: extension {name!r} = {c.extensions.get(name)!r}, want {want!r}"
+            )
     if w.get("ifMatch") is not None and c.if_match != w["ifMatch"]:
         raise AssertionError(f"{rel}: ifMatch = {c.if_match!r}, want {w['ifMatch']!r}")
     if w.get("inputValues"):

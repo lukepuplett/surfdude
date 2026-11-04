@@ -74,7 +74,11 @@ func (Dialect) Read(resp *http.Response, body []byte) (*hypertext.Resource, erro
 func controls(links []link) []hypertext.Control {
 	out := make([]hypertext.Control, 0, len(links))
 	for _, l := range links {
-		c := hypertext.Control{Rel: l.Rel, Title: l.Description, Href: l.Href, Method: l.Method, IfMatch: l.IfMatch, Form: len(l.Form) > 0}
+		c := hypertext.Control{Rel: l.Rel, Href: l.Href, Method: l.Method, IfMatch: l.IfMatch, Form: len(l.Form) > 0}
+		if l.Description != "" {
+			desc, _ := json.Marshal(l.Description)
+			c.Extensions = map[string]json.RawMessage{"description": desc}
+		}
 		for _, in := range l.Form {
 			hin := hypertext.Input{Name: in.Name, Required: !in.IsOptional, Value: in.Value}
 			schema := hypertext.Schema{}

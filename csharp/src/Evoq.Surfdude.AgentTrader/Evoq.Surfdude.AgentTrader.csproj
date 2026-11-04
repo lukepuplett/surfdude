@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <RootNamespace>Evoq</RootNamespace>
+    <LangVersion>latest</LangVersion>
+
+    <title>Surfdude for AgentTrader</title>
+    <description>Surfdude dynamically drives really RESTful APIs. This package works with APIs that return the AgentTrader response envelope.</description>
+    <packageTags>rest;restful;api;hateoas;hypertext;hypermedia;json;agenttrader</packageTags>
+    <packageId>Surfdude.AgentTrader.Client</packageId>
+    <repositoryUrl>https://github.com/lukepuplett/surfdude</repositoryUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Evoq.Surfdude.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Evoq.Surfdude\Evoq.Surfdude.csproj" />
+  </ItemGroup>
+
+</Project>

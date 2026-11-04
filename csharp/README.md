@@ -31,7 +31,7 @@ dotnet pack src/Evoq.Surfdude/Evoq.Surfdude.csproj -c Release
 dotnet pack src/Evoq.Surfdude.SimpleJson/Evoq.Surfdude.SimpleJson.csproj -c Release
 ```
 
-Package ids on NuGet: **`Surfdude`**, **`Surfdude.SimpleJson.Client`**. Version tracks repo [`VERSION`](../VERSION) via [`Directory.Build.props`](Directory.Build.props). **GitHub tag releases do not push to NuGet** — build with [`../scripts/tag-release/build-local.sh`](../scripts/tag-release/build-local.sh) or `dotnet pack`, then upload manually. See [../docs/releasing.md#net--nuget-manual](../docs/releasing.md#net--nuget-manual). Legacy script: [build/Publish-ToNuGet.ps1](build/Publish-ToNuGet.ps1).
+Package ids on NuGet: **`Surfdude`**, **`Surfdude.SimpleJson.Client`**, **`Surfdude.AgentTrader.Client`**. Version tracks repo [`VERSION`](../VERSION) via [`Directory.Build.props`](Directory.Build.props). **GitHub tag releases do not push to NuGet** — build with [`../scripts/tag-release/build-local.sh`](../scripts/tag-release/build-local.sh) or `dotnet pack`, then upload manually. See [../docs/releasing.md#net--nuget-manual](../docs/releasing.md#net--nuget-manual). Legacy script: [build/Publish-ToNuGet.ps1](build/Publish-ToNuGet.ps1).
 
 ## Layout
 
@@ -64,6 +64,36 @@ await surfer.Wave()
 `Surf.Wave(rootUri)` and `Surf.Wave(SurfContext)` remain for older call sites. They use the same shared default `HttpClient` as `Surfer.For` when you do not pass a client.
 
 Surfdude does **not** retry inside the library. For production, attach Polly or `Microsoft.Extensions.Http.Resilience` to the `HttpClient` you pass in. See [Driving a real server](../README.md#driving-a-real-server) in the root README.
+
+### Signing in again
+
+A surfer cannot add a handler to a client it is given, so the handler goes in the client's pipeline:
+
+```csharp
+HttpClient client = null;
+var handler = new SignInHandler(async (unauthorized, ct) =>
+{
+    // unauthorized is the 401 that showed the need. Sign in however the API says, through the same client.
+    var response = await client.PostAsync(signInUrl, credentialContent, ct);
+    return await response.Content.ReadAsStringAsync(ct);   // the access token
+}) { InnerHandler = new HttpClientHandler() };
+client = new HttpClient(handler);
+
+var surfer = Surfer.For(root).WithHttpClient(client);
+```
+
+The handler sends its token as `Authorization: Bearer`. When a request is refused with a 401 it calls your delegate, keeps the token, and sends the same request again once, with the body intact. Requests that fail together share one sign-in. A wave that lists 401 in `ExpectedStatusCodes` is testing the refusal and is left alone, and the requests the delegate sends cannot call it again. A delegate that throws, or returns no token, fails the step with `SignInFailedException`. The request body is held in memory so it can be sent again. Nothing signs in before the first request: the first 401 is what asks for it, in every language.
+
+### AgentTrader
+
+`Surfdude.AgentTrader.Client` reads the AgentTrader envelope (`_links`, `_actions` with `fields`, `data` items with their own controls) and builds the request each control describes: server-prefilled values first, then yours, checked against the control's inputs; JSON body for POST, PUT and PATCH, query string for GET, `If-Match` from `ifMatch`, a dotted name nested in the body.
+
+```csharp
+var surfer = AgentTraderSurfer.For("https://agenttrader.net/").WithHttpClient(client);
+await surfer.Wave().FromRoot().ThenSubmit("search-listings", new { make = "MINI" }).GoAsync();
+```
+
+Every key on a link or action that the model has no member for, such as `requires`, `price`, `title` and `type`, is kept in `IHypertextControl.ControlData` as the JSON text the server sent. `AgentTraderControlData` names the common ones. Nothing in the core acts on them: a 401 or 402 is what tells the client a session or payment is needed (see `SignInHandler`). Status, notes, paging and problems have nowhere to go in the C# model yet, so the shared conformance cases check controls only.
 
 Dialect contract and fixtures: [docs/dialects.md](../docs/dialects.md). Prefilled **`value`** on simple `form` entries is merged on submit like AgentTrader `fields[].value` — see [Form values](../docs/model.md#form-values-for-api-writers-and-for-journeys).
 

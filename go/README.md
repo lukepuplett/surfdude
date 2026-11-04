@@ -11,7 +11,7 @@ examples/    journeys against a running AgentTrader
 internal/conformance/   checks a dialect against /fixtures
 ```
 
-Module path `github.com/lukepuplett/surfdude/go`. It matches the repository, which was renamed from `surfdude-csharp` to `surfdude` on 2026-11-02, so `go get github.com/lukepuplett/surfdude/go@v0.2.0` needs no `go.work` or `replace`. The public proxy may serve a stale failure for a short while after the rename: `GOPROXY=direct GONOSUMDB=github.com/lukepuplett/surfdude` works around it. [Form values and prefills](../docs/model.md#form-values-for-api-writers-and-for-journeys) · [C# client](../csharp/README.md)
+Module path `github.com/lukepuplett/surfdude/go`. It matches the repository, which was renamed from `surfdude-csharp` to `surfdude` on 2026-11-02, so `go get github.com/lukepuplett/surfdude/go@v0.4.0` needs no `go.work` or `replace`. The public proxy may serve a stale failure for a short while after the rename: `GOPROXY=direct GONOSUMDB=github.com/lukepuplett/surfdude` works around it. [Form values and prefills](../docs/model.md#form-values-for-api-writers-and-for-journeys) · [C# client](../csharp/README.md)
 
 ## Installation
 
@@ -20,7 +20,7 @@ Module path `github.com/lukepuplett/surfdude/go`. It matches the repository, whi
 To install the `surf` executable to your `$GOPATH/bin`:
 
 ```sh
-go install github.com/lukepuplett/surfdude/go/cmd/surf@v0.2.0
+go install github.com/lukepuplett/surfdude/go/cmd/surf@v0.4.0
 ```
 
 You can also download standalone binaries for Linux, macOS, and Windows from [GitHub Releases](https://github.com/lukepuplett/surfdude/releases).
@@ -30,7 +30,7 @@ You can also download standalone binaries for Linux, macOS, and Windows from [Gi
 To use Surfdude in your Go module:
 
 ```sh
-go get github.com/lukepuplett/surfdude/go/surf@v0.2.0
+go get github.com/lukepuplett/surfdude/go/surf@v0.4.0
 ```
 
 ## Try the CLI tool on a running server
@@ -72,8 +72,8 @@ Give the surfer a way to get a session and a journey never has to mention tokens
 
 ```go
 signIn := func(ctx context.Context, from *surf.Page) (string, error) {
-	// from is the page that showed the need: the page whose control requires a session, or the
-	// page the server sent with a 401. If the API offers a sign-in control it is right there.
+	// from is the page the server sent with the 401. If the API offers a sign-in control it is
+	// right there.
 	next, err := from.Submit(ctx, "sign-in", surf.Values{"credential": credential})
 	if err != nil {
 		return "", err
@@ -84,7 +84,7 @@ signIn := func(ctx context.Context, from *surf.Page) (string, error) {
 s := surftest.New(t, url, surf.WithDialects(agenttrader.New()), surf.WithSignIn(signIn))
 ```
 
-The hook runs in two situations. When a control needs a session and the surfer holds no token, it signs in first instead of refusing the step. When a step is refused with a 401, it signs in and sends the same request again, once. Any number of steps that fail together share one sign-in. A step that says `surf.Expect(401)` is testing the refusal, so it is left alone, and the sign-in step itself can never call the hook. Without `WithSignIn` nothing changes: a step that needs a session with no token is refused before any request is sent.
+The hook runs when a step is refused with a 401: it signs in and sends the same request again, once. A surfer that holds no token yet is no different, so the first 401 is what signs it in. A control that says it `requires` a session is sent like any other, because nothing in the surfer reads `requires`. Any number of steps that fail together share one sign-in. A step that says `surf.Expect(401)` is testing the refusal, so it is left alone, and the sign-in step itself can never call the hook. Without `WithSignIn` nothing changes: the server's 401 comes back as the usual `UnexpectedStatusError`.
 
 ### Recording samples from the real response
 

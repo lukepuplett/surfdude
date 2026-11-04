@@ -16,7 +16,7 @@ namespace Evoq.Surfdude.Hypertext.Http
 
         internal override async Task<HttpResponseMessage> ExecuteStepRequestAsync(HttpStep previous, CancellationToken cancellationToken)
         {
-            return await this.StepContext.HttpClient.GetAsync(this.Uri, cancellationToken);
+            return await this.GetAsync(this.Uri, cancellationToken);
         }
     }
 }

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextvars
+import threading
 import time
 import uuid
 from collections.abc import Callable
@@ -9,7 +11,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from surfdude.dialect import Dialect, Registry
+from surfdude.dialect import Dialect, HTTPResponse, Registry
 from surfdude.hypertext import (
     Control,
     InvalidInputError,
@@ -18,10 +20,10 @@ from surfdude.hypertext import (
     RelNotFoundError,
     RequestFailedError,
     Resource,
+    SignInFailedError,
     UnexpectedInputError,
     UnexpectedStatusError,
 )
-from surfdude.surf.preflight import preflight
 from surfdude.surf.request import build_request, response_from_httpx
 from surfdude.surf.retry import RetryAttempt, RetryPolicy, is_idempotent, never
 from surfdude.surf.values import Values, merge
@@ -30,6 +32,17 @@ if TYPE_CHECKING:
     from surfdude.surf.wave import Wave
 
 MAX_BODY = 4 << 20
+
+SignInFunc = Callable[["Page"], str]
+"""Signs in and returns the access token to use.
+
+The page is the one that showed the need: the page whose control requires a session, or the page the
+server sent with a 401. It carries the server's advice and, if the API offers one, a sign-in control
+to follow.
+"""
+
+_signing_in: contextvars.ContextVar[bool] = contextvars.ContextVar("surfdude_signing_in", default=False)
+"""True while the sign-in hook runs, so the steps the hook takes cannot call the hook again."""
 
 
 @dataclass
@@ -122,7 +135,6 @@ class Page:
         if control is None:
             offered = [c.rel for c in controls]
             raise RelNotFoundError(rel=rel, where=where, offered=offered)
-        preflight(control, self.surfer.token)
         vals, err = _safe_merge(control, values)
         if err:
             raise err
@@ -209,6 +221,8 @@ class Surfer:
     agent: str = "surfdude-python"
     retry: RetryPolicy | None = None
     sleep: Callable[[float], None] = field(default=time.sleep)
+    sign_in: SignInFunc | None = None
+    _sign_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     @classmethod
     def new(
@@ -219,6 +233,7 @@ class Surfer:
         retry: RetryPolicy | None = None,
         timeout: float = 30.0,
         sleep: Callable[[float], None] | None = None,
+        sign_in: SignInFunc | None = None,
     ) -> Surfer:
         if not dialects:
             raise ValueError("Unable to start. A Surfer needs at least one dialect.")
@@ -232,6 +247,7 @@ class Surfer:
             client=client or httpx.Client(timeout=timeout),
             retry=retry,
             sleep=sleep or time.sleep,
+            sign_in=sign_in,
         )
 
     def set_bearer(self, token: str) -> None:
@@ -283,10 +299,34 @@ class Surfer:
             policy = never
 
         attempts = 1
+        signed_in_again = False
         while True:
             resp, error = self._send(req)
             if error is None and expect(resp.status_code):
                 break
+
+            # A 401 means the session is gone. If the surfer knows how to sign in, it does that once
+            # and sends the same request again. A step that expects 401 is testing the refusal, so it
+            # is left alone, and so is the sign-in step itself (see _signing_in).
+            if (
+                self.sign_in is not None
+                and not signed_in_again
+                and resp is not None
+                and resp.status_code == 401
+                and not expect(401)
+                and not _signing_in.get()
+                and _replayable(req)
+            ):
+                stale = req.headers.get("Authorization", "").removeprefix("Bearer ")
+                try:
+                    self._sign_in_again(self._page_from(resp, attempts), stale)
+                except SignInFailedError as exc:
+                    exc.step = step
+                    raise
+                req = _rebuilt(req, self.token)
+                signed_in_again = True
+                continue
+
             wait = policy(
                 RetryAttempt(
                     number=attempts,
@@ -306,6 +346,28 @@ class Surfer:
             raise RequestFailedError(step=step, cause=error, attempts=attempts) from error
         assert resp is not None
 
+        page, msg, dialect = self._read(resp, attempts)
+        if dialect is None:
+            if not expect(resp.status_code):
+                raise UnexpectedStatusError(
+                    step=step, status=resp.status_code, attempts=attempts, url=page.url
+                )
+            raise self.registry.unsupported(msg)
+        resource = page.resource
+        assert resource is not None
+        if not expect(resp.status_code):
+            raise UnexpectedStatusError(
+                step=step,
+                status=resp.status_code,
+                message=resource.message,
+                resource=resource,
+                attempts=attempts,
+                url=page.url,
+            )
+        return page
+
+    def _read(self, resp: httpx.Response, attempts: int) -> tuple[Page, HTTPResponse, Dialect | None]:
+        """Turn a response into a page. The dialect is None when none can read it."""
         body = resp.content
         if len(body) > MAX_BODY:
             body = body[:MAX_BODY]
@@ -319,25 +381,36 @@ class Surfer:
         msg = response_from_httpx(resp)
         msg.body = body
         dialect = self.registry.choose(msg)
-        if dialect is None:
-            if not expect(resp.status_code):
-                raise UnexpectedStatusError(
-                    step=step, status=resp.status_code, attempts=attempts, url=page.url
-                )
-            raise self.registry.unsupported(msg)
-        page.dialect = dialect.name()
-        resource = dialect.read(msg)
-        page.resource = resource
-        if not expect(resp.status_code):
-            raise UnexpectedStatusError(
-                step=step,
-                status=resp.status_code,
-                message=resource.message,
-                resource=resource,
-                attempts=attempts,
-                url=page.url,
-            )
-        return page
+        if dialect is not None:
+            page.dialect = dialect.name()
+            page.resource = dialect.read(msg)
+        return page, msg, dialect
+
+    def _page_from(self, resp: httpx.Response, attempts: int) -> Page:
+        """The response as a page, for the sign-in hook to read. It never raises for status."""
+        return self._read(resp, attempts)[0]
+
+    def _sign_in_again(self, from_page: Page, stale: str) -> None:
+        """Run the hook, one caller at a time.
+
+        ``stale`` is the token the failed request used, or "" when there was none. If the token has
+        changed by the time this caller gets its turn, another step has already signed in, and there
+        is nothing to do but send the request again.
+        """
+        assert self.sign_in is not None
+        with self._sign_lock:
+            if self.token != stale:
+                return
+            marker = _signing_in.set(True)
+            try:
+                token = self.sign_in(from_page)
+            except Exception as exc:
+                raise SignInFailedError(step="", cause=exc) from exc
+            finally:
+                _signing_in.reset(marker)
+            if not token:
+                raise SignInFailedError(step="", cause=None)
+            self.token = token
 
     def close(self) -> None:
         self.client.close()
@@ -352,3 +425,20 @@ class Surfer:
         from surfdude.surf.wave import Wave
 
         return Wave(self)
+
+
+def _replayable(req: httpx.Request) -> bool:
+    """True when the request body can be sent again, which a streamed body cannot."""
+    try:
+        _ = req.content
+    except httpx.RequestNotRead:
+        return False
+    return True
+
+
+def _rebuilt(req: httpx.Request, token: str) -> httpx.Request:
+    """The same request again, body intact, carrying the new token."""
+    headers = httpx.Headers(req.headers)
+    headers.pop("Content-Length", None)
+    headers["Authorization"] = f"Bearer {token}"
+    return httpx.Request(req.method, req.url, headers=headers, content=req.content)

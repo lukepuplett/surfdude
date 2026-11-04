@@ -5,11 +5,12 @@ from surfdude.hypertext.errors import (
     NoDataError,
     RelNotFoundError,
     RequestFailedError,
+    SignInFailedError,
     UnexpectedInputError,
     UnexpectedStatusError,
     UnsupportedMediaTypeError,
 )
-from surfdude.hypertext.model import Control, Input, Item, Paging, Price, Problem, Resource, Schema
+from surfdude.hypertext.model import Control, Input, Item, Paging, Problem, Resource, Schema
 
 __all__ = [
     "Control",
@@ -20,12 +21,12 @@ __all__ = [
     "MultiItemReadError",
     "NoDataError",
     "Paging",
-    "Price",
     "Problem",
     "RelNotFoundError",
     "RequestFailedError",
     "Resource",
     "Schema",
+    "SignInFailedError",
     "UnexpectedInputError",
     "UnexpectedStatusError",
     "UnsupportedMediaTypeError",

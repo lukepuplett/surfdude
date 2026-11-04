@@ -9,13 +9,13 @@ Installing this package provides the `surfdude` Python library for code you writ
 Install the package into your Python environment:
 
 ```sh
-pip install surfdude==0.1.0
+pip install surfdude==0.4.0
 ```
 
 If you use `uv`, add the package to your project:
 
 ```sh
-uv add surfdude==0.1.0
+uv add surfdude==0.4.0
 ```
 
 ## Toolchain (if developing in this repo)
@@ -66,6 +66,24 @@ with Surfer.new("http://localhost:8080", AgentTraderDialect()) as s:
 ```
 
 See [../docs/model.md](../docs/model.md) and [../docs/dialects.md](../docs/dialects.md).
+
+## Signing in again
+
+Give the surfer a function that gets a session and a journey never has to mention tokens:
+
+```python
+def sign_in(from_page: Page) -> str:
+    # from_page is the page the server sent with the 401. If the API offers a sign-in control it is
+    # right there.
+    next_page = from_page.submit("sign-in", {"credential": credential})
+    got: dict = {}
+    next_page.read(got)
+    return got["token"]
+
+surfer = Surfer.new(url, AgentTraderDialect(), sign_in=sign_in)
+```
+
+The function runs when a step is refused with a 401: it signs in and sends the same request again, once. A surfer that holds no token yet is no different, so the first 401 is what signs it in. A control that says it `requires` a session is sent like any other, because nothing in the surfer reads `requires`. Steps that fail together on different threads share one sign-in. A step with `expect=lambda code: code == 401` is testing the refusal, so it is left alone, and the sign-in step itself can never call the function. A function that raises, or returns no token, fails the step with `SignInFailedError`. Without `sign_in` nothing changes: the server's 401 comes back as the usual `UnexpectedStatusError`.
 
 ## Publishing
 

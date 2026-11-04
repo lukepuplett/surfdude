@@ -55,12 +55,13 @@ def _controls(links: list) -> list[Control]:
         form = link.get("form") or []
         c = Control(
             rel=link.get("rel", ""),
-            title=link.get("description", ""),
             href=link.get("href", ""),
             method=link.get("method", ""),
             if_match=link.get("ifMatch", ""),
             form=len(form) > 0,
         )
+        if link.get("description"):
+            c.extensions["description"] = link["description"]
         for inp in form:
             hin = Input(
                 name=inp.get("name", ""),

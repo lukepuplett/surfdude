@@ -10,6 +10,7 @@ package hypertext
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 )
@@ -26,32 +27,44 @@ type Input struct {
 	Schema   Schema
 }
 
-// Price is shown on a control that needs a payment, for example an x402 amount.
-type Price struct {
-	Amount   string
-	Currency string
-	Note     string
-}
-
 // Control is something a client can follow or submit. It is found by Rel.
+//
+// Only what changes the request, or how the control is found, has a field: Rel, Href, Method, Enctype,
+// Inputs and IfMatch. Anything else a dialect finds on a control, such as what it requires or what it
+// costs, is an extension. The surfer never reads extensions.
 type Control struct {
-	Rel   string
-	Title string
-	Href  string
+	Rel  string
+	Href string
 	// Method is the HTTP method. Empty means GET.
 	Method string
 	// Enctype is the media type to send the body in. Empty means the dialect's default.
 	Enctype string
-	// Type is the media type the control serves, when it is not the usual one.
-	Type string
 	// Form is true when the control carries inputs to send, false for a plain link.
 	Form   bool
 	Inputs []Input
-	// Requires lists what the caller needs first, for example "agent-session".
-	Requires []string
 	// IfMatch is the version the control expects, sent as If-Match.
 	IfMatch string
-	Price   *Price
+	// Extensions holds the dialect's own parts of the control, keyed by the dialect's own name, each
+	// value the JSON the server sent. See Extension and DecodeExtension.
+	Extensions map[string]json.RawMessage
+}
+
+// Extension returns the raw JSON of one of the control's extensions.
+func (c Control) Extension(name string) (json.RawMessage, bool) {
+	raw, ok := c.Extensions[name]
+	return raw, ok
+}
+
+// DecodeExtension decodes one extension into into, and reports whether the control had it.
+func (c Control) DecodeExtension(name string, into any) (bool, error) {
+	raw, ok := c.Extensions[name]
+	if !ok {
+		return false, nil
+	}
+	if err := json.Unmarshal(raw, into); err != nil {
+		return true, fmt.Errorf("Unable to read the %q extension of %q. %w", name, c.Rel, err)
+	}
+	return true, nil
 }
 
 // HTTPMethod is the upper-case method, GET when none was given.

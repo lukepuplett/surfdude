@@ -109,6 +109,22 @@ class RequestFailedError(Exception):
 
 
 @dataclass
+class SignInFailedError(Exception):
+    """Signing in again failed: the hook raised, or it gave no token."""
+
+    step: str
+    cause: Exception | None = None
+
+    def __str__(self) -> str:
+        if self.cause is None:
+            return (
+                f"Unable to {self.step}. Signing in again gave no token, "
+                "so the request cannot be sent again."
+            )
+        return f"Unable to {self.step}. Signing in again failed: {self.cause}"
+
+
+@dataclass
 class NoDataError(Exception):
     def __str__(self) -> str:
         return "Unable to read data. The response carried none."

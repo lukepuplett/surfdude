@@ -28,7 +28,7 @@
         {
             IHypertextControl control = previous.Resource.GetControl(this.Rel);
 
-            return await this.StepContext.HttpClient.GetAsync(control.HRef, cancellationToken);
+            return await this.GetAsync(control.HRef, cancellationToken);
         }
     }
 }

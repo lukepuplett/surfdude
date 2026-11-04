@@ -58,15 +58,14 @@ func WithDialects(ds ...dialect.Dialect) Option {
 // WithBearer sets the access token sent as Authorization: Bearer.
 func WithBearer(token string) Option { return func(s *Surfer) { s.token = token } }
 
-// SignInFunc signs in and returns the access token to use. from is the page that showed the need: the
-// page whose control requires a session, or the page the server sent with a 401. It carries the
-// server's advice and, if the API offers one, a sign-in control to follow.
+// SignInFunc signs in and returns the access token to use. from is the page the server sent with
+// the 401. It carries the server's advice and, if the API offers one, a sign-in control to follow.
 type SignInFunc func(ctx context.Context, from *Page) (token string, err error)
 
-// WithSignIn sets how the surfer gets a session. The hook runs when a control needs a session and the
-// surfer holds no token, and when a step is refused with 401. It runs once for any number of steps
-// that need it at the same moment, and a step replays at most once after it. Without it, a step that
-// needs a session and has no token is refused before any request is sent.
+// WithSignIn sets how the surfer gets a session. The hook runs when a step is refused with 401, and
+// the step is sent again once with the token it returns. It runs once for any number of steps that
+// fail together. Nothing is signed in before the first request: a control that says it requires a
+// session is sent like any other, and the server's 401 is what asks for the sign-in.
 func WithSignIn(f SignInFunc) Option { return func(s *Surfer) { s.signIn = f } }
 
 // WithRetry sets the retry policy for every step. Without it nothing is retried. A step can override
@@ -461,18 +460,6 @@ func (p *Page) take(ctx context.Context, controls []hypertext.Control, where, re
 			offered[i] = cc.Rel
 		}
 		return nil, &hypertext.RelNotFoundError{Rel: rel, Where: where, Offered: offered}
-	}
-
-	// A control that needs a session, with no token held: sign in first if we know how, rather than
-	// send a request the server is bound to refuse.
-	if p.s.signIn != nil && len(c.Requires) > 0 && p.s.bearer() == "" && !signingIn(ctx) {
-		if err := p.s.signInAgain(ctx, p, ""); err != nil {
-			return nil, fmt.Errorf("Unable to follow %q. %w", rel, err)
-		}
-	}
-
-	if err := preflight(c, p.s.bearer()); err != nil {
-		return nil, err
 	}
 
 	cfg := config(opts)

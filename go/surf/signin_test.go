@@ -202,8 +202,12 @@ func TestWithSignIn_ReplaysAFormBodyIntact(t *testing.T) {
 	}
 }
 
-// Scenario: a control that needs a session signs in first when the surfer holds no token
-func TestWithSignIn_WhenAControlNeedsASessionAndThereIsNoToken_SignsInBeforeSending(t *testing.T) {
+// Scenario: with no token held, the first 401 is what signs in
+//
+//	Given a surfer holding no token and a control that says it requires a session
+//	When a journey follows it
+//	Then the request goes out, the server answers 401, the surfer signs in and sends it again
+func TestWithSignIn_WhenThereIsNoToken_SignsInOnTheFirst401(t *testing.T) {
 	// Arrange
 	a := newAuthServer(t)
 	var calls atomic.Int32
@@ -215,27 +219,30 @@ func TestWithSignIn_WhenAControlNeedsASessionAndThereIsNoToken_SignsInBeforeSend
 
 	// Assert
 	if err != nil || page.Status != 200 {
-		t.Fatalf("Follow returned %v (page %+v), want it to sign in first and succeed", err, page)
+		t.Fatalf("Follow returned %v (page %+v), want it to sign in after the 401 and succeed", err, page)
 	}
-	if signIns, requests := a.counts(); signIns != 1 || requests != 1 {
-		t.Errorf("server saw %d sign-ins and %d protected requests, want 1 and 1: no wasted request", signIns, requests)
+	if signIns, requests := a.counts(); signIns != 1 || requests != 2 {
+		t.Errorf("server saw %d sign-ins and %d protected requests, want 1 and 2 (refused, then replayed)", signIns, requests)
+	}
+	if got := a.seenAuth; len(got) != 2 || got[0] != "" || got[1] != "Bearer T1" {
+		t.Errorf("Authorization headers = %q, want [\"\", \"Bearer T1\"]", got)
 	}
 }
 
-// Without the hook, behaviour is unchanged: no token means the step is refused before sending.
-func TestWithoutSignIn_NoTokenIsStillRefusedBeforeSending(t *testing.T) {
+// Without the hook, behaviour is plain: no token means the request is sent and the server's 401 comes back.
+func TestWithoutSignIn_NoTokenSendsTheRequestAndTheServerRefuses(t *testing.T) {
 	a := newAuthServer(t)
 	s := authSurfer(t, a)
 	home, _ := s.Root(context.Background())
 
 	_, err := home.Follow(context.Background(), "protected")
 
-	var notMet *hypertext.RequiresNotMetError
-	if !errors.As(err, &notMet) {
-		t.Errorf("Follow returned %v, want *RequiresNotMetError", err)
+	var refused *hypertext.UnexpectedStatusError
+	if !errors.As(err, &refused) || refused.Status != 401 {
+		t.Errorf("Follow returned %v, want the server's 401 as *UnexpectedStatusError", err)
 	}
-	if _, requests := a.counts(); requests != 0 {
-		t.Errorf("%d requests were sent, want none", requests)
+	if _, requests := a.counts(); requests != 1 {
+		t.Errorf("%d requests were sent, want one", requests)
 	}
 }
 

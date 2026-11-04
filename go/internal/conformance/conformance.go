@@ -56,7 +56,7 @@ type control struct {
 	Method      string         `json:"method"`
 	Inputs      []string       `json:"inputs"`
 	Required    []string       `json:"required"`
-	Requires    []string       `json:"requires"`
+	Extensions  map[string]any `json:"extensions"`
 	IfMatch     string         `json:"ifMatch"`
 	InputValues map[string]any `json:"inputValues"`
 }
@@ -185,8 +185,12 @@ func checkControl(t *testing.T, rel string, c hypertext.Control, w control) {
 			t.Errorf("%s: required = %v, want %v", rel, names, w.Required)
 		}
 	}
-	if w.Requires != nil && !slices.Equal(c.Requires, w.Requires) {
-		t.Errorf("%s: requires = %v, want %v", rel, c.Requires, w.Requires)
+	for name, want := range w.Extensions {
+		var got any
+		found, err := c.DecodeExtension(name, &got)
+		if err != nil || !found || !reflect.DeepEqual(got, want) {
+			t.Errorf("%s: extension %q = %v (found %v, err %v), want %v", rel, name, got, found, err, want)
+		}
 	}
 	if c.IfMatch != w.IfMatch {
 		t.Errorf("%s: ifMatch = %q, want %q", rel, c.IfMatch, w.IfMatch)

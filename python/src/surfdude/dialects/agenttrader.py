@@ -4,7 +4,7 @@ import json
 from email.message import Message
 
 from surfdude.dialect import HTTPResponse
-from surfdude.hypertext import Control, Input, Item, Paging, Price, Problem, Resource
+from surfdude.hypertext import Control, Input, Item, Paging, Problem, Resource
 
 PROFILE_URI = "https://agenttrader.net/profiles/envelope/v1"
 
@@ -84,37 +84,36 @@ def _parse_media_type(value: str) -> str:
     return msg.get_content_type()
 
 
+_LINK_CORE = {"rel", "href", "method"}
+_ACTION_CORE = {"rel", "action", "method", "enctype", "ifMatch", "fields"}
+
+
+def _extensions(raw: dict, core: set[str]) -> dict:
+    """Every key the model has no field for, as the server sent it."""
+    return {k: v for k, v in raw.items() if k not in core}
+
+
 def _to_controls(links: list, actions: list) -> list[Control]:
     out: list[Control] = []
     for link in links:
         out.append(
             Control(
                 rel=link.get("rel", ""),
-                title=link.get("title", ""),
                 href=link.get("href", ""),
                 method=link.get("method", ""),
-                type=link.get("type", ""),
-                requires=list(link.get("requires") or []),
+                extensions=_extensions(link, _LINK_CORE),
             )
         )
     for action in actions:
         c = Control(
             rel=action.get("rel", ""),
-            title=action.get("title", ""),
             href=action.get("action", ""),
             method=action.get("method", ""),
             enctype=action.get("enctype", ""),
             form=True,
-            requires=list(action.get("requires") or []),
             if_match=action.get("ifMatch", ""),
+            extensions=_extensions(action, _ACTION_CORE),
         )
-        price = action.get("price")
-        if price:
-            c.price = Price(
-                amount=price.get("amount", ""),
-                currency=price.get("currency", ""),
-                note=price.get("note", ""),
-            )
         for field in action.get("fields") or []:
             c.inputs.append(
                 Input(

@@ -7,14 +7,14 @@
     {
         public static bool TryParseIfMatch(this IHypertextControl hypertextControl, out string ifMatch)
         {
-            ifMatch = hypertextControl.ControlData.FirstOrDefault(cd => cd.Key == HttpControlData.IfMatchControlName).Value;
+            ifMatch = hypertextControl.IfMatch;
 
             return ifMatch != null;
         }
 
         public static HttpMethod DetermineHttpMethod(this IHypertextControl hypertextControl)
         {
-            var firstMethodValue = hypertextControl.ControlData.FirstOrDefault(cd => cd.Key == HttpControlData.MethodControlName).Value?.ToLowerInvariant();
+            var firstMethodValue = hypertextControl.Method?.ToUpperInvariant();
 
             if (firstMethodValue == null)
             {

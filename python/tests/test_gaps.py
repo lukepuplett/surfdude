@@ -12,13 +12,14 @@ import httpx
 import pytest
 
 from surfdude import AgentTraderDialect, Surfer
-from surfdude.hypertext import InvalidInputError, NoDataError
-from surfdude.hypertext.errors import MultiItemReadError
-from surfdude.surf.preflight import (
-    NonHypermediaControlError,
-    PaymentRequiredError,
-    RequiresNotMetError,
+from surfdude.hypertext import (
+    InvalidInputError,
+    MissingInputError,
+    NoDataError,
+    UnexpectedStatusError,
+    UnsupportedMediaTypeError,
 )
+from surfdude.hypertext.errors import MultiItemReadError
 
 PROFILE = '<https://agenttrader.net/profiles/envelope/v1>; rel="profile"'
 
@@ -31,13 +32,17 @@ def _json(status: int, body: dict[str, Any]) -> httpx.Response:
     )
 
 
-def test_gap01_requires_preflight_before_http() -> None:
+def test_gap01_requires_is_not_acted_on_the_servers_answer_decides() -> None:
     secret_hits = 0
 
     def handler(request: httpx.Request) -> httpx.Response:
         nonlocal secret_hits
         if request.url.path == "/secret":
             secret_hits += 1
+            return _json(
+                401,
+                {"status": 401, "message": "Sign in", "notes": ["missing: agent-session"], "data": []},
+            )
         return _json(
             200,
             {
@@ -59,19 +64,20 @@ def test_gap01_requires_preflight_before_http() -> None:
     client = httpx.Client(transport=httpx.MockTransport(handler), base_url="http://test")
     surfer = Surfer.new("http://test/", AgentTraderDialect(), client=client)
     home = surfer.root()
-    with pytest.raises(RequiresNotMetError) as exc:
+    with pytest.raises(UnexpectedStatusError) as exc:
         home.follow("secret")
-    assert "agent-session" in str(exc.value).lower()
-    assert secret_hits == 0
+    assert exc.value.status == 401, "the server's 401, not a local refusal"
+    assert secret_hits == 1, "the request is sent once"
 
 
-def test_gap02_price_preflight_before_post() -> None:
+def test_gap02_price_is_not_acted_on_the_servers_answer_decides() -> None:
     post_hits = 0
 
     def handler(request: httpx.Request) -> httpx.Response:
         nonlocal post_hits
         if request.method == "POST" and request.url.path == "/paid":
             post_hits += 1
+            return _json(402, {"status": 402, "message": "Payment required", "data": []})
         return _json(
             200,
             {
@@ -93,13 +99,13 @@ def test_gap02_price_preflight_before_post() -> None:
 
     client = httpx.Client(transport=httpx.MockTransport(handler), base_url="http://test")
     surfer = Surfer.new("http://test/", AgentTraderDialect(), client=client)
-    with pytest.raises(PaymentRequiredError) as exc:
+    with pytest.raises(UnexpectedStatusError) as exc:
         surfer.root().submit("buy", {"sku": "x"})
-    assert "pay" in str(exc.value).lower()
-    assert post_hits == 0
+    assert exc.value.status == 402, "the server's 402, not a local refusal"
+    assert post_hits == 1, "the request is sent once"
 
 
-def test_gap03_non_hypermedia_type_preflight() -> None:
+def test_gap03_type_is_not_acted_on_an_unreadable_answer_is_reported() -> None:
     html_hits = 0
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -122,9 +128,9 @@ def test_gap03_non_hypermedia_type_preflight() -> None:
 
     client = httpx.Client(transport=httpx.MockTransport(handler), base_url="http://test")
     surfer = Surfer.new("http://test/", AgentTraderDialect(), client=client)
-    with pytest.raises(NonHypermediaControlError):
+    with pytest.raises(UnsupportedMediaTypeError):
         surfer.root().follow("human-page")
-    assert html_hits == 0
+    assert html_hits == 1, "the request is sent once and the unreadable answer is reported"
 
 
 def test_gap04_read_on_list_page_must_select_item(gap_listings_server: httpx.Client) -> None:
@@ -302,5 +308,5 @@ def test_preflight_runs_before_input_validation() -> None:
 
     client = httpx.Client(transport=httpx.MockTransport(handler), base_url="http://test")
     surfer = Surfer.new("http://test/", AgentTraderDialect(), client=client)
-    with pytest.raises(RequiresNotMetError):
+    with pytest.raises(MissingInputError):
         surfer.root().submit("shortlist", {})

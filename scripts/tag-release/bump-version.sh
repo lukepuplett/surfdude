@@ -16,10 +16,10 @@ cd "$root"
 
 printf '%s\n' "$new" > VERSION
 
-sed -i "s/^version = \".*\"/version = \"$new\"/" python/pyproject.toml
+sed -i.bak "s/^version = \".*\"/version = \"$new\"/" python/pyproject.toml && rm python/pyproject.toml.bak
 
-sed -i "s|<Version>.*</Version>|<Version>$new</Version>|" csharp/Directory.Build.props
-sed -i "s|<PackageVersion>.*</PackageVersion>|<PackageVersion>$new</PackageVersion>|" csharp/Directory.Build.props
+# -i.bak then rm works on both GNU and macOS sed
+sed -i.bak -e "s|<Version>.*</Version>|<Version>$new</Version>|" -e "s|<PackageVersion>.*</PackageVersion>|<PackageVersion>$new</PackageVersion>|" csharp/Directory.Build.props && rm csharp/Directory.Build.props.bak
 
 echo "Bumped to $new. Run ./scripts/tag-release/check.sh then:"
 echo "  git commit -am \"Release v$new\""
