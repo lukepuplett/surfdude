@@ -445,7 +445,26 @@ func (i *ItemPage) Submit(ctx context.Context, rel string, v Values, opts ...Ste
 	return i.page.take(ctx, i.item.Controls, fmt.Sprintf("Item %d", i.index), rel, append(opts, With(v)))
 }
 
+// Prepare builds the request Submit or Follow would send for a control of this page, and sends
+// nothing. The values are checked against the control exactly as a real step checks them, so it
+// fails with the same errors. The request carries the surfer's bearer token, so a caller that shows
+// it must hide that header.
+func (p *Page) Prepare(ctx context.Context, rel string, opts ...Step) (*http.Request, error) {
+	req, _, err := p.prepare(ctx, p.Resource.Controls, "This page", rel, opts)
+	return req, err
+}
+
 func (p *Page) take(ctx context.Context, controls []hypertext.Control, where, rel string, opts []Step) (*Page, error) {
+	req, cfg, err := p.prepare(ctx, controls, where, rel, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return p.s.do(req, fmt.Sprintf("follow %q", rel), cfg.expect, cfg.retry)
+}
+
+// prepare finds the control, checks the values against it and builds the request, without sending.
+func (p *Page) prepare(ctx context.Context, controls []hypertext.Control, where, rel string, opts []Step) (*http.Request, stepConfig, error) {
 	var c hypertext.Control
 	found := false
 	for _, candidate := range controls {
@@ -459,27 +478,27 @@ func (p *Page) take(ctx context.Context, controls []hypertext.Control, where, re
 		for i, cc := range controls {
 			offered[i] = cc.Rel
 		}
-		return nil, &hypertext.RelNotFoundError{Rel: rel, Where: where, Offered: offered}
+		return nil, stepConfig{}, &hypertext.RelNotFoundError{Rel: rel, Where: where, Offered: offered}
 	}
 
 	cfg := config(opts)
 	vals, err := merge(c, cfg.values)
 	if err != nil {
-		return nil, err
+		return nil, cfg, err
 	}
 
 	req, err := buildRequest(ctx, p.s.reg, p.URL, c, vals, p.s.bearer())
 	if err != nil {
-		return nil, err
+		return nil, cfg, err
 	}
 
 	if cfg.idempotencyKey {
 		key, err := newIdempotencyKey()
 		if err != nil {
-			return nil, err
+			return nil, cfg, err
 		}
 		req.Header.Set("Idempotency-Key", key)
 	}
 
-	return p.s.do(req, fmt.Sprintf("follow %q", rel), cfg.expect, cfg.retry)
+	return req, cfg, nil
 }
