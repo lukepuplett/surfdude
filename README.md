@@ -81,7 +81,12 @@ surf show http://localhost:8080
 
 # Crawl all reachable links and report any broken controls
 surf explore http://localhost:8080
+
+# Take a step: name what to do, never a URL or a method (unreleased: see docs/cli.md)
+surf http://localhost:8080 register email=me@example.test
 ```
+
+Besides reading, `surf` can send: one step, a chain of steps with `then`, or a journey written in a file, with secrets kept out of the output. See [docs/cli.md](docs/cli.md).
 
 ---
 

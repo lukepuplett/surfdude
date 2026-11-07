@@ -2,6 +2,18 @@
 
 Go and Python share one version. The .NET packages have their own, because they were already on 1.x on nuget.org (`Surfdude` and `Surfdude.SimpleJson.Client` 1.0.3) when the others were on 0.x. While a major version is 0, a minor release can break the API, and each break is listed first.
 
+## Unreleased
+
+### Added
+
+- **Go: the `surf` command line can send, not only read.** `surf ROOT REL name=value ...` finds the control with that rel on the front door, checks the values against it and sends it, so you name what to do and never a URL or a method. Steps chain with the word `then`, passing values forward with `--keep NAME=PATH[~PATTERN]` and `{name}`. `surf run FILE` runs a journey written one step a line. `surf describe ROOT REL` prints a form's fields and limits as a fill-in template, and `--dry-run` shows the request a step would send and sends nothing. `--sign-in 'name=value'` signs in on a 401 and tries the step again once.
+- **Values** are `name=text`, `name:=JSON`, `name=@file`, `name=@-` (standard input), `name=env:VAR` and `--secret name` (asked for with the typing hidden). A mistake is refused before anything is sent, with what is accepted.
+- **Output** is compact for people by default, `--json` for the whole response, `-q PATH` for one value. **Exit codes:** 0 worked, 1 the server refused, 2 the command was wrong, 3 the server could not be reached, 4 the server failed.
+- **Secrets are never printed.** Values from standard input, the environment or `--secret`, and any field named like a credential, token, password or secret, show as `<secret>` in a dry run and are never in an error. See [docs/cli.md](docs/cli.md).
+- **Go: `surf.Page.Prepare`** builds the request a step would send without sending it. `Follow` and `Submit` share its code.
+- The command's logic is the new package `go/cli`, so it is tested without a subprocess. `show` and `explore` are unchanged and keep their output and exit codes.
+- Not built: `surf shell`, `--profile`, and the Python and C# versions. See `docs/cli.md`.
+
 ## 0.4.0
 
 0.3.0 was prepared but never tagged or published, so there is no 0.3.0 release: its changes are in this one. The last published versions were Go 0.2.0 and PyPI 0.1.0.

@@ -6,7 +6,8 @@ dialect/     the Dialect interface and the registry that picks one per response
 dialects/    simple and agenttrader media-type readers (see ../docs/dialects.md)
 surf/        Surfer, Page, Follow/Submit/Item/Read, the fluent Wave, and Explore
 surftest/    helpers that fail a Go test with the helpful error
-cmd/surf/    the command line: show and explore
+cli/         the surf command line as a function a test can call (see ../docs/cli.md)
+cmd/surf/    the command line: a few lines that call cli.Run
 examples/    journeys against a running AgentTrader
 internal/conformance/   checks a dialect against /fixtures
 ```
@@ -33,14 +34,24 @@ To use Surfdude in your Go module:
 go get github.com/lukepuplett/surfdude/go/surf@v0.4.0
 ```
 
-## Try the CLI tool on a running server
+## The `surf` command line
+
+`surf` follows a server's own links, like a journey does, and can send things as well as read them. You name what to do (a rel), never a URL or a method:
 
 ```sh
-go run ./cmd/surf show http://localhost:8080
+go run ./cmd/surf http://localhost:8080                                   # what does the front door offer?
+go run ./cmd/surf describe http://localhost:8080 register                 # what does this form take?
+go run ./cmd/surf http://localhost:8080 register email=me@example.test    # take one step
+go run ./cmd/surf --dry-run http://localhost:8080 register email=me@example.test   # show the request, send nothing
+go run ./cmd/surf -q data.0.token --sign-in 'credential=env:CRED' http://localhost:8080 protected
+go run ./cmd/surf http://localhost:8080 register email=$A then verify-email email=$A code=123456
+go run ./cmd/surf run journey.surf                                        # a journey written in a file
 go run ./cmd/surf -known-rels path/to/rels.md explore http://localhost:8080
 ```
 
-`-known-rels` takes a markdown table of backticked rels (or one rel per line). Any rel the server sends that is not on the list is reported.
+Values are `name=text`, `name:=JSON`, `name=@file`, `name=@-` (stdin), `name=env:VAR`, or `--secret name` (asked for with the typing hidden). Exit codes: 0 worked, 1 the server refused it, 2 the command was wrong (nothing sent), 3 could not reach the server, 4 the server failed. Secrets are never printed. See [../docs/cli.md](../docs/cli.md) for the chain syntax (`then`, `--keep`, `{name}`), the full list of rules, and what is not built yet.
+
+`-known-rels` takes a markdown table of backticked rels (or one rel per line). Any rel the server sends that is not on the list is reported by `explore`.
 
 ## Journeys in code
 

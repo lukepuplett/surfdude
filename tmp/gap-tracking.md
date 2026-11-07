@@ -77,6 +77,26 @@ GAP-11, GAP-12 and GAP-13 were built in Go first. The Go tests are the specifica
 | GAP-12 | **Built** as `SignInHandler`; tests in `SignInHandlerTests.cs`. Not built: a `Surfer.WithSignIn` (a surfer cannot add a handler to a client it was given, so the caller puts the handler in the pipeline). Original brief: belongs in the `HttpClient` pipeline, like retries: a `DelegatingHandler` that, on a 401 from a request not marked as expecting it, calls a sign-in delegate, sets the bearer and sends the request again once. Content can only be sent twice if buffered (`LoadIntoBufferAsync`) or rebuilt. Concurrent requests share one sign-in (`SemaphoreSlim` and a changed-token check). Same guards as Go. | `go/surf/signin_test.go` |
 | GAP-13 | C# has no test-helper package. Consider an existing snapshot tool (Verify, Snapper) with a scrubber for the base address and volatile fields before writing one. | `go/surftest/golden_test.go` |
 
+## To port to Python and C#: the `surf` command line that sends (Go, unreleased)
+
+Go has a command line that can send, not only `show` and `explore`: `surf ROOT REL name=value ... [then REL ...]`, `surf run FILE`, `surf describe ROOT REL`, `--dry-run`, `--sign-in`, `--secret`, `--json`, `-q`. It is described in `docs/cli.md`. Python has no command line at all (listed below). A C# console app exists (`csharp/`); whether to give it the same commands, or to ship the Go `surf` as the one tool, is undecided.
+
+To port, copy the Go tests in `go/cli/` as the specification, not the code. What each file pins:
+
+| Go test file | What it specifies |
+|---|---|
+| `values_test.go` | the value syntax: `name=text`, `name:=JSON` (a number keeps its exact digits), `@file`, `@-` (read once), `env:VAR` (unset is an error); which values are secret (source, or name contains credential, token, password, secret) |
+| `chain_test.go` | steps joined by `then`; `--keep NAME=PATH[~PATTERN]` (first group, else whole match); `--secret NAME`; `{name}` must be kept by an earlier step, checked before anything is sent; only `name=text` values are templates |
+| `run_test.go`, `run_chain_test.go` | one step and a chain: a step's rel is found on the last response and then on the front door; a mistake is refused before the first request; the exit codes (0 worked, 1 refused, 2 usage, 3 network, 4 server); the chain stops at the first failure; only the last response is printed; refusals go to stderr (stdout stays empty, except with `--json`) |
+| `dryrun_test.go` | the request is shown and not sent; secrets, the bearer token and secret-looking query and body fields are masked; a file value shows its source; a chain shows only the first step |
+| `signin_test.go` | on a 401, follow `sign-in` from the 401 page or the front door, take the token at `--token-path`, retry once; a missing sign-in rel is a usage error; sign-in values are read before anything is sent and cannot be templates |
+| `secret_test.go` | `--secret`: one line of stdin per secret when not at a terminal, a hidden prompt at one, and a refusal rather than echo when typing cannot be hidden |
+| `script_test.go` | `run FILE`: `root URL` first, one step per line, `#` comments, shell-style quotes, errors name their line |
+| `describe_test.go` | fields, required stars, limits, a fill-in line |
+| `legacy_test.go` | `show` and `explore` unchanged |
+
+The one library change: Go's `Page.Prepare` (build a request without sending it, with the same checks as `Submit`). Python and C# need the equivalent for `--dry-run`.
+
 ## Still open (not covered by the tests above)
 
 - Python is synchronous only. An async client (`httpx.AsyncClient`) is a separate piece of work and needs its own retry and sleep seam.
