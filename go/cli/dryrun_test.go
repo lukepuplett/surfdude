@@ -166,7 +166,7 @@ func TestMaskedURL(t *testing.T) {
 	u, _ := url.Parse("https://x.test/lookup?token=abc123&to=a%40b.test&note=plain")
 	mask := map[string]string{"note": "<@notes.txt>"}
 
-	got := maskedURL(u, mask)
+	got := maskedURL(u, mask, masking{})
 
 	if strings.Contains(got, "abc123") || !strings.Contains(got, "to=a%40b.test") || !strings.Contains(got, "note=%3C%40notes.txt%3E") {
 		t.Fatalf("maskedURL = %s", got)
@@ -179,14 +179,14 @@ func TestMaskedURL(t *testing.T) {
 func TestMaskBody(t *testing.T) {
 	mask := map[string]string{"location.lat": "<secret>"}
 
-	if got := maskBody("application/json", []byte(`{"email":"a@b.test","location":{"lat":51.5,"lon":-0.1},"authToken":"zzz"}`), mask); got !=
-		`{"authToken":"<secret>","email":"a@b.test","location":{"lat":"<secret>","lon":-0.1}}` {
+	if got := maskBody("application/json", []byte(`{"email":"a@b.test","location":{"lat":51.5,"lon":-0.1},"access_token":"zzz","authToken":"visible"}`), mask, masking{}); got !=
+		`{"access_token":"<secret>","authToken":"visible","email":"a@b.test","location":{"lat":"<secret>","lon":-0.1}}` {
 		t.Errorf("JSON body = %s", got)
 	}
-	if got := maskBody("application/x-www-form-urlencoded", []byte(`email=a%40b.test&password=pw`), nil); got != `email=a%40b.test&password=%3Csecret%3E` {
+	if got := maskBody("application/x-www-form-urlencoded", []byte(`email=a%40b.test&password=pw`), nil, masking{}); got != `email=a%40b.test&password=%3Csecret%3E` {
 		t.Errorf("form body = %s", got)
 	}
-	if got := maskBody("text/plain", []byte(`just text`), nil); got != "<body of 9 bytes, text/plain>" {
+	if got := maskBody("text/plain", []byte(`just text`), nil, masking{}); got != "<body of 9 bytes, text/plain>" {
 		t.Errorf("other body = %s", got)
 	}
 }

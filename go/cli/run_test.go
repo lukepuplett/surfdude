@@ -152,7 +152,6 @@ func TestRun_UsageErrorsSendNothingAndSayWhatIsAccepted(t *testing.T) {
 	}{
 		{"a missing required field", []string{"register"}, "email"},
 		{"a field the form does not have", []string{"register", "email=a@b.test", "colour=red"}, "colour"},
-		{"a rel the server does not offer", []string{"nope"}, "register"},
 		{"text where a number belongs", []string{"set-count", "count=abc"}, "count:="},
 		{"a number out of range", []string{"set-count", "count:=99"}, "at most 10"},
 		{"something that is not an email", []string{"register", "email=not an address"}, "email"},

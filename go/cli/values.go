@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -98,11 +97,13 @@ type resolver struct {
 	env       func(string) string
 	stdin     *bufio.Reader
 	stdinUsed bool
+	mask      masking // hides values by their field name; a value's source hides it regardless
 }
 
-// resolve reads one arg's value.
+// resolve reads one arg's value. A value is secret by its field name, unless --reveal was given, and
+// is secret by its source (standard input, the environment) whatever --reveal says.
 func (r *resolver) resolve(a arg) (value, error) {
-	v := value{Name: a.Name, Secret: isSecretName(a.Name)}
+	v := value{Name: a.Name, Secret: r.mask.hides(a.Name)}
 
 	switch a.Kind {
 	case kindText:
@@ -177,20 +178,4 @@ func (r *resolver) readStdinLine(name string) (string, error) {
 func trimNewline(s string) string {
 	s = strings.TrimSuffix(s, "\n")
 	return strings.TrimSuffix(s, "\r")
-}
-
-var secretWords = [][]byte{[]byte("credential"), []byte("token"), []byte("password"), []byte("secret")}
-
-// isSecretName says whether a field name looks like it holds a secret, so its value is hidden
-// wherever the command shows a request. It errs towards hiding: a field called tokenizer is hidden
-// too. The agent key is not a secret and is not hidden.
-func isSecretName(name string) bool {
-	lower := bytes.ToLower([]byte(name))
-	for _, w := range secretWords {
-		if bytes.Contains(lower, w) {
-			return true
-		}
-	}
-
-	return false
 }

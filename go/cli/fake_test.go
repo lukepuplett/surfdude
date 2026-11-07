@@ -41,6 +41,13 @@ const (
 	secretAction = `{"rel":"set-password","action":"/password","method":"POST","fields":[` +
 		`{"name":"password","required":true,"schema":{"type":"string"}},` +
 		`{"name":"email","required":true,"schema":{"type":"string"}}]}`
+	// prefillAction has prefilled values, one under a hidden name and one under a name that only looks
+	// like one, to show which of them describe hides.
+	prefillAction = `{"rel":"set-prefilled","action":"/prefilled","method":"POST","fields":[` +
+		`{"name":"password","value":"prefilled-pw-77","schema":{"type":"string"}},` +
+		`{"name":"passwordHint","value":"prefilled-hint-88","schema":{"type":"string"}}]}`
+	// outboxLink is what the register response offers next in a sandbox: where the code can be read.
+	outboxLink = `{"rel":"outbox","href":"/sandbox/outbox{?to}","method":"GET"}`
 )
 
 func newFakeAPI(t *testing.T) *fakeAPI {
@@ -65,23 +72,49 @@ func newFakeAPI(t *testing.T) *fakeAPI {
 			`"_links":[{"rel":"health","href":"/health","method":"GET"},`+
 			`{"rel":"outbox","href":"/sandbox/outbox{?to}","method":"GET"},`+
 			`{"rel":"protected","href":"/protected","method":"GET"},`+
-			`{"rel":"peek","href":"/peek{?token,to}","method":"GET"}],`+
-			`"_actions":[`+registerAction+`,`+verifyAction+`,`+signInAction+`,`+countAction+`,`+secretAction+`,`+
+			`{"rel":"peek","href":"/peek{?token,to}","method":"GET"},`+
+			`{"rel":"bare","href":"/bare","method":"GET"},`+
+			`{"rel":"locked","href":"/locked","method":"GET"},`+
+			`{"rel":"secrets","href":"/secrets","method":"GET"}],`+
+			`"_actions":[`+registerAction+`,`+verifyAction+`,`+signInAction+`,`+countAction+`,`+secretAction+`,`+prefillAction+`,`+
 			`{"rel":"refuse","action":"/refuse","method":"POST","fields":[]},`+
 			`{"rel":"boom","action":"/boom","method":"POST","fields":[]}]}`)
 	})
+	// Each response in the sign-up chain offers the next step, as a well-behaved API does, so a chain
+	// can follow it without going back to the front door.
 	mux.HandleFunc("POST /auth/email/start", func(w http.ResponseWriter, r *http.Request) {
-		send(w, 202, `{"status":202,"message":"Accepted","notes":["A code is on its way."],"data":[],"_actions":[`+verifyAction+`]}`)
+		send(w, 202, `{"status":202,"message":"Accepted","notes":["A code is on its way."],"data":[],"_links":[`+outboxLink+`],"_actions":[`+verifyAction+`]}`)
 	})
 	mux.HandleFunc("GET /sandbox/outbox", func(w http.ResponseWriter, r *http.Request) {
-		send(w, 200, `{"status":200,"message":"OK","data":[{"to":"`+r.URL.Query().Get("to")+`","text":"Your code is 654321"}]}`)
+		send(w, 200, `{"status":200,"message":"OK","data":[{"to":"`+r.URL.Query().Get("to")+`","text":"Your code is 654321"}],"_actions":[`+verifyAction+`]}`)
+	})
+	// bare is a page that offers nothing, so a step after it can only come from the front door.
+	mux.HandleFunc("GET /bare", func(w http.ResponseWriter, r *http.Request) {
+		send(w, 200, `{"status":200,"message":"OK","data":[{"bare":true}]}`)
+	})
+	// locked refuses with 401 and offers no way to sign in, though the front door does.
+	mux.HandleFunc("GET /locked", func(w http.ResponseWriter, r *http.Request) {
+		if f.last().Auth != "Bearer tok_signed" {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="fake"`)
+			send(w, 401, `{"status":401,"message":"Sign in again","data":[]}`)
+			return
+		}
+		send(w, 200, `{"status":200,"message":"OK","data":[{"hello":"locked-you"}]}`)
+	})
+	// secrets has fields that are hidden by their name and fields that only look as if they should be.
+	mux.HandleFunc("GET /secrets", func(w http.ResponseWriter, r *http.Request) {
+		send(w, 200, `{"status":200,"message":"OK","data":[{"agentKey":"agt_key","token":"tok-sum-1","accessToken":"acc-sum-2",`+
+			`"credential":"cred-sum-3","apiKey":"key-sum-4","passwordWasRight":true,"tokenizer":"tokenizer-visible"}]}`)
+	})
+	mux.HandleFunc("POST /prefilled", func(w http.ResponseWriter, r *http.Request) {
+		send(w, 200, `{"status":200,"message":"OK","data":[{"stored":true}]}`)
 	})
 	mux.HandleFunc("POST /auth/email/verify", func(w http.ResponseWriter, r *http.Request) {
 		if jsonBody(r)["code"] != "654321" {
 			send(w, 422, `{"status":422,"message":"Unable to verify the code. The code was not accepted.","data":[{"field":"code","code":"wrong","message":"No."}]}`)
 			return
 		}
-		send(w, 200, `{"status":200,"message":"OK","notes":["Store the credential now."],"data":[{"agentKey":"agt_key","credential":"agt_testcredential","token":"tok_verify","recovered":false}]}`)
+		send(w, 200, `{"status":200,"message":"OK","notes":["Store the credential now."],"data":[{"agentKey":"agt_key","credential":"agt_testcredential","token":"tok_verify","recovered":false}],"_actions":[`+signInAction+`]}`)
 	})
 	mux.HandleFunc("POST /auth/token", func(w http.ResponseWriter, r *http.Request) {
 		if jsonBody(r)["credential"] != "agt_testcredential" {

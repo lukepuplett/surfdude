@@ -59,23 +59,15 @@ func TestRun_ChainPrintsOnlyTheLastResponse(t *testing.T) {
 	}
 }
 
-// Scenario: a step's rel is found on the last response first, and then at the front door
-func TestRun_AStepFallsBackToTheFrontDoor(t *testing.T) {
-	api := newFakeAPI(t)
-
-	// outbox's response offers nothing, so verify-email can only come from the front door.
-	r := runCLI(t, "", nil, api.URL, "outbox", "to=a@b.test", "then", "set-count", "count:=2")
-
-	if r.Code != ExitOK || api.count("POST", "/count") != 1 {
-		t.Fatalf("exit %d, %d POST /count, want 0 and 1\nstderr: %s", r.Code, api.count("POST", "/count"), r.ErrOut)
-	}
-}
+// The tests below are about what a chain does, not about how it finds a step, and they chain to rels
+// that only the front door offers, so they pass --front-door. How a step is found is in
+// frontdoor_test.go.
 
 // Scenario: the chain stops at the first failing step and exits with that step's code
 func TestRun_ChainStopsAtTheFirstFailure(t *testing.T) {
 	api := newFakeAPI(t)
 
-	r := runCLI(t, "", nil, api.URL, "register", "email=a@b.test", "then", "refuse", "then", "boom")
+	r := runCLI(t, "", nil, "--front-door", api.URL, "register", "email=a@b.test", "then", "refuse", "then", "boom")
 
 	if r.Code != ExitRefused {
 		t.Fatalf("exit %d, want 1, the code of the refused step\nstderr: %s", r.Code, r.ErrOut)
@@ -117,7 +109,7 @@ func TestRun_KeepWithAMissingPathStopsTheChain(t *testing.T) {
 func TestRun_KeepWithAPatternTakesTheMatch(t *testing.T) {
 	api := newFakeAPI(t)
 
-	r := runCLI(t, "", nil, "-q", "data.0.stored", api.URL, "outbox", "to=a@b.test", "--keep", "code=data.0.text~[0-9]{6}", "then", "set-count", "count:=1", "note={code}")
+	r := runCLI(t, "", nil, "--front-door", "-q", "data.0.stored", api.URL, "outbox", "to=a@b.test", "--keep", "code=data.0.text~[0-9]{6}", "then", "set-count", "count:=1", "note={code}")
 
 	if r.Code != ExitOK || !strings.Contains(api.last().Body, `"note":"654321"`) {
 		t.Fatalf("exit %d, body %q, want the note to be exactly the match 654321\nstderr: %s", r.Code, api.last().Body, r.ErrOut)
@@ -125,14 +117,14 @@ func TestRun_KeepWithAPatternTakesTheMatch(t *testing.T) {
 
 	// With a group, the group is what is kept.
 	api2 := newFakeAPI(t)
-	runCLI(t, "", nil, api2.URL, "outbox", "to=a@b.test", "--keep", `code=data.0.text~is ([0-9]+)`, "then", "set-count", "count:=1", "note={code}")
+	runCLI(t, "", nil, "--front-door", api2.URL, "outbox", "to=a@b.test", "--keep", `code=data.0.text~is ([0-9]+)`, "then", "set-count", "count:=1", "note={code}")
 	if !strings.Contains(api2.last().Body, `"note":"654321"`) {
 		t.Fatalf("body %q, want the first group to be kept", api2.last().Body)
 	}
 
 	// A pattern that does not match is an error, not an empty value.
 	api3 := newFakeAPI(t)
-	if r := runCLI(t, "", nil, api3.URL, "outbox", "to=a@b.test", "--keep", `code=data.0.text~zzz`, "then", "set-count", "count:=1"); r.Code != ExitUsage {
+	if r := runCLI(t, "", nil, "--front-door", api3.URL, "outbox", "to=a@b.test", "--keep", `code=data.0.text~zzz`, "then", "set-count", "count:=1"); r.Code != ExitUsage {
 		t.Fatalf("a pattern that does not match exit %d, want 2", r.Code)
 	}
 	if api3.count("POST", "/count") != 0 {

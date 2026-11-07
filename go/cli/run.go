@@ -31,6 +31,11 @@ const (
 	ExitUsage   = 2 // the command was wrong: nothing was sent
 	ExitNetwork = 3 // the server could not be reached, or its answer could not be read
 	ExitServer  = 4 // the server failed (5xx)
+
+	// ExitNotOffered: the name you gave is not offered by the page it was looked for on. A typo and a
+	// missing control cannot be told apart, like "command not found" in bash, so one code covers both
+	// and the message lists what the page does offer. ExitUsage is for a badly formed command line.
+	ExitNotOffered = 5
 )
 
 // IO is what the command talks to.
@@ -46,7 +51,7 @@ type IO struct {
 	Client *http.Client
 }
 
-const usageText = `usage: surf [flags] ROOT                       show what the front door offers
+const usageHead = `usage: surf [flags] ROOT                       show what the front door offers
        surf [flags] ROOT REL [name=value ...]  take one step: find REL on the page and send it
        surf [flags] ROOT REL ... then REL ...  take several steps, one after another
        surf [flags] describe ROOT REL          what does this form take?
@@ -54,7 +59,16 @@ const usageText = `usage: surf [flags] ROOT                       show what the 
        surf [flags] show|explore ROOT          read an API, or crawl it and report problems
 
 values:  name=text   name:=JSON   name=@file   name=@-   name=env:VAR
-flags go before ROOT:`
+exit:    0 ok, 1 refused (4xx), 2 usage, 3 network, 4 server failed (5xx), 5 rel not offered`
+
+// usageText is the usage text. Its hidden line is built from the list the masking uses, so the two
+// cannot disagree.
+func usageText() string {
+	return usageHead + "\n" +
+		"hidden:  values of fields named " + strings.Join(hiddenFieldNames, ", ") + " (any case, _ and - ignored)\n" +
+		"         are hidden in output and dry runs; --reveal shows them\n" +
+		"flags go before ROOT:"
+}
 
 type flags struct {
 	dialects  string
@@ -67,6 +81,8 @@ type flags struct {
 	dryRun    bool
 	signIn    string
 	tokenPath string
+	frontDoor bool
+	reveal    bool
 }
 
 // cmd is one run of the command.
@@ -95,6 +111,8 @@ func Run(args []string, std IO, env func(string) string) int {
 	fs.BoolVar(&c.f.dryRun, "dry-run", false, "show the request the first step would send, with secrets hidden, and send nothing")
 	fs.StringVar(&c.f.signIn, "sign-in", "", "values for the sign-in rel, such as 'credential=env:CRED': on a 401, sign in with them and try the step again once")
 	fs.StringVar(&c.f.tokenPath, "token-path", "data.0.token", "where the access token is in the sign-in response")
+	fs.BoolVar(&c.f.reveal, "reveal", false, "show values that are hidden because of their field name (see hidden: above); values you gave from --secret, @- or env:, and the bearer token, stay hidden")
+	fs.BoolVar(&c.f.frontDoor, "front-door", false, "allow a step whose rel the last response does not offer to be taken from the front door, with a note on stderr (a missing control is the API's bug, so this is off by default)")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			c.printUsage(std.Stdout, fs)
@@ -150,16 +168,26 @@ func Run(args []string, std IO, env func(string) string) int {
 }
 
 func (c *cmd) printUsage(w io.Writer, fs *flag.FlagSet) {
-	fmt.Fprintln(w, usageText)
+	fmt.Fprintln(w, usageText())
 	fs.SetOutput(w)
 	fs.PrintDefaults()
 	fs.SetOutput(io.Discard)
 }
 
+// masking is how this run hides values by their field name: always, unless --reveal was given.
+func (c *cmd) masking() masking { return masking{reveal: c.f.reveal} }
+
 // usage prints a mistake in the command and returns the usage exit code.
 func (c *cmd) usage(err error) int {
 	fmt.Fprintln(c.std.Stderr, err)
 	return ExitUsage
+}
+
+// reject prints an error found before a step was sent, and returns the exit code that kind of error
+// has: ExitNotOffered for a rel the page does not offer, ExitUsage for a badly formed command.
+func (c *cmd) reject(err error) int {
+	fmt.Fprintln(c.std.Stderr, err)
+	return exitFor(err)
 }
 
 // parseDialects turns the --dialects flag into dialects.
@@ -273,7 +301,7 @@ func (c *cmd) runSteps(ctx context.Context, rootURL string, steps []step) int {
 		return c.usage(err)
 	}
 
-	r := &resolver{env: c.env, stdin: bufio.NewReader(c.std.Stdin)}
+	r := &resolver{env: c.env, stdin: bufio.NewReader(c.std.Stdin), mask: c.masking()}
 	resolved := make([][]value, len(steps))
 	for i, st := range steps {
 		vals, err := c.resolveStep(r, st)
@@ -309,9 +337,9 @@ func (c *cmd) runSteps(ctx context.Context, rootURL string, steps []step) int {
 	cur, last := root, root
 	kept := map[string]keptValue{}
 	for i, st := range steps {
-		page, err := pickPage(cur, root, st.Rel)
+		page, err := c.pick(cur, root, st.Rel)
 		if err != nil {
-			return c.usage(err)
+			return c.reject(err)
 		}
 		vals, mask, err := buildValues(resolved[i], kept)
 		if err != nil {
@@ -338,7 +366,7 @@ func (c *cmd) runSteps(ctx context.Context, rootURL string, steps []step) int {
 					return c.usage(usagef("Unable to keep %s: the value at %s does not match the pattern %s.", k.Name, k.Path, k.Pattern))
 				}
 			}
-			kept[k.Name] = keptValue{Text: text, Secret: isSecretName(k.Name) || isSecretName(k.Path)}
+			kept[k.Name] = keptValue{Text: text, Secret: c.masking().hidesKept(k)}
 		}
 		cur, last = resp, resp
 	}
@@ -350,7 +378,7 @@ func (c *cmd) runSteps(ctx context.Context, rootURL string, steps []step) int {
 // read says nothing. The address is masked, so a secret in a query string is not shown.
 func (c *cmd) announce(req *http.Request, rel string, mask map[string]string) {
 	if req.Method != http.MethodGet {
-		fmt.Fprintf(c.std.Stderr, "%s %s -> %s\n", req.Method, rel, maskedURL(req.URL, mask))
+		fmt.Fprintf(c.std.Stderr, "%s %s -> %s\n", req.Method, rel, maskedURL(req.URL, mask, c.masking()))
 	}
 }
 
@@ -387,8 +415,8 @@ func (c *cmd) resolveSignIn(r *resolver) ([]value, error) {
 	return vals, nil
 }
 
-// signInHook is what surf.WithSignIn runs when a step is refused with 401: follow the sign-in rel,
-// from the 401 page if it offers one and otherwise from the front door, and return the token from
+// signInHook is what surf.WithSignIn runs when a step is refused with 401: follow the sign-in rel from
+// the 401 page, or from the front door only when --front-door was given, and return the token from
 // the response.
 func (c *cmd) signInHook(vals []value, root **surf.Page) surf.SignInFunc {
 	return func(ctx context.Context, from *surf.Page) (string, error) {
@@ -396,7 +424,7 @@ func (c *cmd) signInHook(vals []value, root **surf.Page) surf.SignInFunc {
 		if root != nil {
 			front = *root
 		}
-		page, err := pickPage(from, front, "sign-in")
+		page, err := c.pick(from, front, "sign-in")
 		if err != nil {
 			return "", err
 		}
@@ -466,14 +494,18 @@ func (c *cmd) askSecret(r *resolver, name string) (string, error) {
 	return text, nil
 }
 
-// pickPage finds the page that offers a rel: the last response first, then the front door. A step
-// names what to do, and what to do is often offered at the front door and not on the last response.
-func pickPage(cur, root *surf.Page, rel string) (*surf.Page, error) {
+// pickPage finds the page that offers a rel. A step must be offered by the page it starts from: the
+// last response, or for the first step the front door. A control that is not on the page you are on is
+// the API's bug, as it would be on a website, so the front door is a way out only when the caller
+// asked for it with --front-door (allowFront). The second result says the front door was used, so the
+// caller can say so.
+func pickPage(cur, root *surf.Page, rel string, allowFront bool) (*surf.Page, bool, error) {
 	if cur != nil && cur.Has(rel) {
-		return cur, nil
+		return cur, false, nil
 	}
-	if root != nil && root.Has(rel) {
-		return root, nil
+	onFront := root != nil && root != cur && root.Has(rel)
+	if onFront && allowFront {
+		return root, true, nil
 	}
 
 	var last, front []string
@@ -484,8 +516,38 @@ func pickPage(cur, root *surf.Page, rel string) (*surf.Page, error) {
 		front = root.Rels()
 	}
 
-	return nil, usagef("Unable to follow %q. The last response offers: %s. The front door offers: %s.",
-		rel, listOrNothing(last), listOrNothing(front))
+	if onFront {
+		return nil, false, notOfferedf("Unable to follow %q. The front door offers it, but the last response does not (it offers: %s). "+
+			"A missing control is the API's bug: each page should offer the next step. "+
+			"Pass --front-door to take it from the front door anyway.", rel, listOrNothing(last))
+	}
+	if cur == root {
+		return nil, false, notOfferedf("Unable to follow %q. The front door offers: %s.%s", rel, listOrNothing(front), didYouMean(rel, front))
+	}
+
+	// A suggestion comes from the pages this step is allowed to use: the last response, and the front
+	// door only when --front-door was given.
+	candidates := last
+	if allowFront {
+		candidates = append(append([]string(nil), last...), front...)
+	}
+
+	return nil, false, notOfferedf("Unable to follow %q. The last response offers: %s. The front door offers: %s.%s",
+		rel, listOrNothing(last), listOrNothing(front), didYouMean(rel, candidates))
+}
+
+// pick is pickPage with this run's --front-door setting, and it says on stderr, once, when a step
+// was taken from the front door instead of the page before it.
+func (c *cmd) pick(cur, root *surf.Page, rel string) (*surf.Page, error) {
+	page, fromFront, err := pickPage(cur, root, rel, c.f.frontDoor)
+	if err != nil {
+		return nil, err
+	}
+	if fromFront {
+		fmt.Fprintf(c.std.Stderr, "note: %q is not on the last response, so it was taken from the front door.\n", rel)
+	}
+
+	return page, nil
 }
 
 func listOrNothing(rels []string) string {
@@ -531,9 +593,9 @@ func (c *cmd) dryRun(ctx context.Context, root *surf.Page, steps []step, resolve
 			fmt.Fprintf(c.std.Stdout, "then %s: not planned (it depends on what the step before returns)\n", st.Rel)
 			continue
 		}
-		page, err := pickPage(root, root, st.Rel)
+		page, _, err := pickPage(root, root, st.Rel, false) // the first step reads the front door itself
 		if err != nil {
-			return c.usage(err)
+			return c.reject(err)
 		}
 		vals, mask, err := buildValues(resolved[i], map[string]keptValue{})
 		if err != nil {
@@ -543,7 +605,7 @@ func (c *cmd) dryRun(ctx context.Context, root *surf.Page, steps []step, resolve
 		if err != nil {
 			return c.usage(withHint(err))
 		}
-		printPlan(c.std.Stdout, st.Rel, req, mask)
+		printPlan(c.std.Stdout, st.Rel, req, mask, c.masking())
 	}
 
 	return ExitOK
@@ -569,7 +631,7 @@ func (c *cmd) fail(page *surf.Page, err error) int {
 		case c.f.json:
 			fmt.Fprintln(c.std.Stderr, err)
 		case page != nil && page.Resource != nil && (page.Resource.Message != "" || len(page.Resource.Problems) > 0):
-			printPage(c.std.Stderr, page)
+			printPage(c.std.Stderr, page, c.masking())
 			if after := page.Header.Get("Retry-After"); after != "" {
 				fmt.Fprintf(c.std.Stderr, "  retry after: %s\n", after)
 			}
@@ -595,7 +657,7 @@ func (c *cmd) finish(page *surf.Page) int {
 		}
 		fmt.Fprintln(c.std.Stdout, text)
 	default:
-		printPage(c.std.Stdout, page)
+		printPage(c.std.Stdout, page, c.masking())
 	}
 
 	return ExitOK

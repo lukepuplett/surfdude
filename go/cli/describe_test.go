@@ -51,14 +51,14 @@ func TestDescribe_ShowsPatternsFormatsAndAddressTemplates(t *testing.T) {
 	}
 }
 
-// Scenario: a rel the server does not offer is a usage error that lists what it does offer
+// Scenario: a rel the server does not offer is exit 5, and the message lists what it does offer
 func TestDescribe_UnknownRelListsWhatIsOffered(t *testing.T) {
 	api := newFakeAPI(t)
 
 	r := runCLI(t, "", nil, "describe", api.URL, "nope")
 
-	if r.Code != ExitUsage || !strings.Contains(r.ErrOut, "register") || !strings.Contains(r.ErrOut, "set-count") {
-		t.Fatalf("exit %d, stderr %q, want 2 and the offered rels", r.Code, r.ErrOut)
+	if r.Code != ExitNotOffered || !strings.Contains(r.ErrOut, "register") || !strings.Contains(r.ErrOut, "set-count") {
+		t.Fatalf("exit %d, stderr %q, want 5 and the offered rels", r.Code, r.ErrOut)
 	}
 }
 
@@ -68,18 +68,18 @@ func TestDescribe_NeedsARootAndARel(t *testing.T) {
 	}
 }
 
-// Scenario: a prefilled value is shown, unless its name says it is a secret
+// Scenario: a prefilled value is shown, unless its name is on the hidden list
 func TestDescribeControl_PrefilledValues(t *testing.T) {
 	c := hypertext.Control{
 		Rel: "set", Href: "/x", Method: "POST", Form: true,
 		Inputs: []hypertext.Input{
 			{Name: "colour", Value: "red", Schema: hypertext.Schema{"type": "string", "enum": []any{"red", "blue"}}},
-			{Name: "apiToken", Value: "tok-prefilled-99", Schema: hypertext.Schema{"type": "string"}},
+			{Name: "accessToken", Value: "tok-prefilled-99", Schema: hypertext.Schema{"type": "string"}},
 		},
 	}
 	var out bytes.Buffer
 
-	describeControl(&out, "http://x.test", c)
+	describeControl(&out, "http://x.test", c, masking{})
 
 	got := out.String()
 	if !strings.Contains(got, "prefilled: red") || !strings.Contains(got, "one of red, blue") {

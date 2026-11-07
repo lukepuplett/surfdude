@@ -47,7 +47,8 @@ func TestRunScript_QuotesAndThenWithinALine(t *testing.T) {
 	path := writeScript(t, "root "+api.URL+"\n"+
 		"register email=a@b.test then set-count count:=1 note=\"two words\"\n")
 
-	r := runCLI(t, "", nil, "run", path)
+	// set-count is only on the front door, and this test is about quotes, not about finding steps.
+	r := runCLI(t, "", nil, "--front-door", "run", path)
 
 	if r.Code != ExitOK || !strings.Contains(api.last().Body, `"note":"two words"`) {
 		t.Fatalf("exit %d, body %q\nstderr: %s", r.Code, api.last().Body, r.ErrOut)

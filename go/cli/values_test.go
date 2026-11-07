@@ -141,11 +141,12 @@ func TestResolve_SecretMarking(t *testing.T) {
 		secret bool
 	}{
 		{arg{Name: "email", Kind: kindText, Raw: "a@b.test"}, false},
-		{arg{Name: "credential", Kind: kindText, Raw: "typed"}, true}, // by its name
-		{arg{Name: "userPassword", Kind: kindText, Raw: "typed"}, true},
-		{arg{Name: "auth.token", Kind: kindText, Raw: "typed"}, true},
-		{arg{Name: "agentKey", Kind: kindText, Raw: "agt_x"}, false}, // the agent key is public
-		{arg{Name: "email", Kind: kindEnv, Raw: "E"}, true},          // by its source
+		{arg{Name: "credential", Kind: kindText, Raw: "typed"}, true}, // by its full name
+		{arg{Name: "access_token", Kind: kindText, Raw: "typed"}, true},
+		{arg{Name: "userPassword", Kind: kindText, Raw: "typed"}, false}, // not a listed name
+		{arg{Name: "auth.token", Kind: kindText, Raw: "typed"}, true},    // a dotted name by its last part
+		{arg{Name: "agentKey", Kind: kindText, Raw: "agt_x"}, false},     // the agent key is public
+		{arg{Name: "email", Kind: kindEnv, Raw: "E"}, true},              // by its source
 	}
 
 	for _, c := range cases {
@@ -164,8 +165,8 @@ func TestIsSecretName(t *testing.T) {
 		"credential": true, "Credential": true, "access_token": true, "TOKEN": true, "password": true,
 		"db.password": true, "client-secret": true, "email": false, "code": false, "agentKey": false, "note": false,
 	} {
-		if got := isSecretName(name); got != want {
-			t.Errorf("isSecretName(%q) = %v, want %v", name, got, want)
+		if got := hiddenByName(name); got != want {
+			t.Errorf("hiddenByName(%q) = %v, want %v", name, got, want)
 		}
 	}
 }

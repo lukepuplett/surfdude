@@ -85,16 +85,8 @@ func bareAPI(t *testing.T) *httptest.Server {
 	return srv
 }
 
-// Scenario: a server that offers no sign-in is a usage error for --sign-in, not a network failure
-func TestSignIn_NoSignInRelIsAUsageError(t *testing.T) {
-	srv := bareAPI(t)
-
-	r := runCLI(t, "", map[string]string{"CRED": "x"}, "--sign-in", "credential=env:CRED", srv.URL, "protected")
-
-	if r.Code != ExitUsage || !strings.Contains(r.ErrOut, "sign-in") {
-		t.Fatalf("exit %d, stderr %q, want 2 naming the missing sign-in", r.Code, r.ErrOut)
-	}
-}
+// A server that offers no sign-in at all is exit 5, not a network failure: see
+// TestNotOffered_NoSignInAnywhereExits5 in notoffered_test.go.
 
 // Scenario: --token-path says where in the sign-in response the token is
 func TestSignIn_TokenPath(t *testing.T) {

@@ -49,7 +49,11 @@ go run ./cmd/surf run journey.surf                                        # a jo
 go run ./cmd/surf -known-rels path/to/rels.md explore http://localhost:8080
 ```
 
-Values are `name=text`, `name:=JSON`, `name=@file`, `name=@-` (stdin), `name=env:VAR`, or `--secret name` (asked for with the typing hidden). Exit codes: 0 worked, 1 the server refused it, 2 the command was wrong (nothing sent), 3 could not reach the server, 4 the server failed. Secrets are never printed. See [../docs/cli.md](../docs/cli.md) for the chain syntax (`then`, `--keep`, `{name}`), the full list of rules, and what is not built yet.
+Values are `name=text`, `name:=JSON`, `name=@file`, `name=@-` (stdin), `name=env:VAR`, or `--secret name` (asked for with the typing hidden). Exit codes: 0 worked, 1 the server refused it, 2 the command line was badly formed (nothing sent), 3 could not reach the server, 4 the server failed, 5 the rel you named is not offered by the page (a typo and a missing control look the same, like "command not found" in bash; the message lists what is offered and suggests a close match).
+
+A step's rel must be offered by the page it starts from: a control missing from the page you are on is the API's bug. `--front-door` lets a step take its rel from the front door instead, with a note on stderr.
+
+Secrets are never printed. Values you give from `--secret`, `@-` or `env:` are hidden by their source, and values under a fixed list of full field names (`credential`, `token`, `accesstoken`, `refreshtoken`, `password`, `secret`, `clientsecret`, `apikey`, `privatekey`, `authorization`) are hidden by name. `--reveal` shows the ones hidden by name, never the others. See [../docs/cli.md](../docs/cli.md) for the chain syntax (`then`, `--keep`, `{name}`), the full list of rules, and what is not built yet.
 
 `-known-rels` takes a markdown table of backticked rels (or one rel per line). Any rel the server sends that is not on the list is reported by `explore`.
 

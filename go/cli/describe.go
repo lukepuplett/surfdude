@@ -24,13 +24,13 @@ func (c *cmd) describe(ctx context.Context, rootURL, rel string) int {
 	}
 	ctrl, ok := root.Control(rel)
 	if !ok {
-		return c.usage(usagef("Unable to describe %q. The front door offers: %s.", rel, listOrNothing(root.Rels())))
+		return c.reject(notOfferedf("Unable to describe %q. The front door offers: %s.%s", rel, listOrNothing(root.Rels()), didYouMean(rel, root.Rels())))
 	}
 	// Show where the control goes, not the path it was written with.
 	if strings.HasPrefix(ctrl.Href, "/") {
 		ctrl.Href = root.URL.Scheme + "://" + root.URL.Host + ctrl.Href
 	}
-	describeControl(c.std.Stdout, rootURL, ctrl)
+	describeControl(c.std.Stdout, rootURL, ctrl, c.masking())
 
 	return ExitOK
 }
@@ -51,8 +51,9 @@ func hrefVars(href string) []string {
 }
 
 // describeControl prints a control's fields and a line to start from. root is how the front door was
-// typed, so the line can be copied.
-func describeControl(w io.Writer, root string, c hypertext.Control) {
+// typed, so the line can be copied. A prefilled value under a hidden name is not shown, unless
+// --reveal was given.
+func describeControl(w io.Writer, root string, c hypertext.Control, m masking) {
 	fmt.Fprintf(w, "%s  %s  %s\n", c.Rel, c.HTTPMethod(), c.Href)
 
 	type field struct {
@@ -66,7 +67,7 @@ func describeControl(w io.Writer, root string, c hypertext.Control) {
 		listed[in.Name] = true
 		fields = append(fields, field{
 			name:     in.Name,
-			detail:   inputDetail(in),
+			detail:   inputDetail(in, m),
 			required: in.Required && in.Value == nil,
 			token:    fieldToken(in.Name, in.Schema),
 		})
@@ -126,7 +127,7 @@ func fieldToken(name string, schema hypertext.Schema) string {
 }
 
 // inputDetail is the type and limits of an input, in a line.
-func inputDetail(in hypertext.Input) string {
+func inputDetail(in hypertext.Input, m masking) string {
 	var parts []string
 	if t, ok := in.Schema["type"].(string); ok {
 		parts = append(parts, t)
@@ -160,7 +161,7 @@ func inputDetail(in hypertext.Input) string {
 	}
 	if in.Value != nil {
 		shown := fmt.Sprint(in.Value)
-		if isSecretName(in.Name) {
+		if m.hides(in.Name) {
 			shown = secretMask
 		}
 		detail += " (prefilled: " + shown + ")"
