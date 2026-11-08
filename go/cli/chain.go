@@ -2,6 +2,7 @@ package cli
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -11,6 +12,11 @@ type step struct {
 	Args    []arg
 	Secrets []string // --secret NAME: prompt for or read these values, never take them from the command line
 	Keeps   []keep   // --keep NAME=PATH: capture a value from this step's response
+	// Expect is --expect STATUS[,STATUS]: the statuses that count as success for this step, in place of
+	// any 2xx. Nil means the default.
+	Expect []int
+	// Unchecked is --unchecked: send the values as given, without checking them against the form.
+	Unchecked bool
 }
 
 // keep captures a value from a step's response for later steps to use as {name}. Pattern, when set,
@@ -93,6 +99,26 @@ func parseStep(tokens []string) (step, error) {
 			}
 			s.Keeps = append(s.Keeps, keep{Name: name, Path: path, Pattern: pattern})
 
+		case "--expect":
+			i++
+			if i >= len(tokens) {
+				return step{}, usagef("--expect needs the statuses to expect, for example --expect 429 or --expect 422,429.")
+			}
+			if err := claim("--expect"); err != nil {
+				return step{}, err
+			}
+			codes, err := parseStatuses(tokens[i])
+			if err != nil {
+				return step{}, err
+			}
+			s.Expect = codes
+
+		case "--unchecked":
+			if err := claim("--unchecked"); err != nil {
+				return step{}, err
+			}
+			s.Unchecked = true
+
 		case "--secret":
 			i++
 			if i >= len(tokens) {
@@ -108,7 +134,7 @@ func parseStep(tokens []string) (step, error) {
 
 		default:
 			if strings.HasPrefix(t, "-") {
-				return step{}, usagef("%q is a flag, and flags go before the root. Only --keep and --secret go inside a step.", t)
+				return step{}, usagef("%q is a flag, and flags go before the root. Only --keep, --secret, --expect and --unchecked go inside a step.", t)
 			}
 			a, err := parseArg(t)
 			if err != nil {
@@ -122,6 +148,25 @@ func parseStep(tokens []string) (step, error) {
 	}
 
 	return s, nil
+}
+
+// parseStatuses reads --expect's value: one or more HTTP statuses from 100 to 599, separated by
+// commas, with nothing else in it. A mistake is refused before anything is sent.
+func parseStatuses(text string) ([]int, error) {
+	bad := func() error {
+		return usagef("--expect needs one or more status codes from 100 to 599, separated by commas, such as 429 or 422,429, not %q.", text)
+	}
+
+	var codes []int
+	for _, part := range strings.Split(text, ",") {
+		code, err := strconv.Atoi(part)
+		if err != nil || code < 100 || code > 599 {
+			return nil, bad()
+		}
+		codes = append(codes, code)
+	}
+
+	return codes, nil
 }
 
 // extract pulls part of a text out by a pattern: the first group if the pattern has one, otherwise the

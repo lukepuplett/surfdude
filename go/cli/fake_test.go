@@ -83,6 +83,13 @@ func newFakeAPI(t *testing.T) *fakeAPI {
 	// Each response in the sign-up chain offers the next step, as a well-behaved API does, so a chain
 	// can follow it without going back to the front door.
 	mux.HandleFunc("POST /auth/email/start", func(w http.ResponseWriter, r *http.Request) {
+		// slow@example.test was sent a code a moment ago: it is told to wait, and the refusal offers the
+		// next step, which is to send back the code it already has.
+		if jsonBody(r)["email"] == "slow@example.test" {
+			w.Header().Set("Retry-After", "90")
+			send(w, 429, `{"status":429,"message":"Unable to start registration. A code was sent recently, so wait before asking again.","data":[],"_actions":[`+verifyAction+`]}`)
+			return
+		}
 		send(w, 202, `{"status":202,"message":"Accepted","notes":["A code is on its way."],"data":[],"_links":[`+outboxLink+`],"_actions":[`+verifyAction+`]}`)
 	})
 	mux.HandleFunc("GET /sandbox/outbox", func(w http.ResponseWriter, r *http.Request) {

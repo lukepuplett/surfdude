@@ -179,8 +179,8 @@ func TestMaskedURL(t *testing.T) {
 func TestMaskBody(t *testing.T) {
 	mask := map[string]string{"location.lat": "<secret>"}
 
-	if got := maskBody("application/json", []byte(`{"email":"a@b.test","location":{"lat":51.5,"lon":-0.1},"access_token":"zzz","authToken":"visible"}`), mask, masking{}); got !=
-		`{"access_token":"<secret>","authToken":"visible","email":"a@b.test","location":{"lat":"<secret>","lon":-0.1}}` {
+	if got := maskBody("application/json", []byte(`{"email":"a@b.test","location":{"lat":51.5,"lon":-0.1},"access_token":"zzz","authTokenHint":"visible"}`), mask, masking{}); got !=
+		`{"access_token":"<secret>","authTokenHint":"visible","email":"a@b.test","location":{"lat":"<secret>","lon":-0.1}}` {
 		t.Errorf("JSON body = %s", got)
 	}
 	if got := maskBody("application/x-www-form-urlencoded", []byte(`email=a%40b.test&password=pw`), nil, masking{}); got != `email=a%40b.test&password=%3Csecret%3E` {

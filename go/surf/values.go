@@ -20,6 +20,14 @@ type Values map[string]any
 // plus any prefilled values they did not override. It fails with an error that names the problem
 // and what the control does accept.
 func merge(c hypertext.Control, v Values) (map[string]any, error) {
+	return mergeWith(c, v, false)
+}
+
+// mergeWith is merge, and with unchecked set it skips every check: an unknown field, a changed
+// read-only input, a missing required field and a value outside its schema all go through, and the
+// caller's values are sent exactly as given. Prefilled values are still merged in, because that is
+// what the form offers, not a check.
+func mergeWith(c hypertext.Control, v Values, unchecked bool) (map[string]any, error) {
 	allowed := map[string]bool{}
 	for _, in := range c.Inputs {
 		allowed[in.Name] = true
@@ -28,9 +36,19 @@ func merge(c hypertext.Control, v Values) (map[string]any, error) {
 		allowed[name] = true
 	}
 
-	for name := range v {
-		if !allowed[name] {
-			return nil, &hypertext.UnexpectedInputError{Rel: c.Rel, Name: name, Allowed: sortedKeys(allowed)}
+	if !unchecked {
+		for name := range v {
+			if !allowed[name] {
+				return nil, &hypertext.UnexpectedInputError{Rel: c.Rel, Name: name, Allowed: sortedKeys(allowed)}
+			}
+		}
+
+		// A read-only input is the API saying "this is decided". The value it offered is sent, and a
+		// caller may repeat it but not change it. With nothing offered there is nothing to repeat.
+		for _, in := range c.Inputs {
+			if given, ok := v[in.Name]; ok && in.ReadOnly() && (in.Value == nil || !sameValue(in.Value, given)) {
+				return nil, &hypertext.ReadOnlyInputError{Rel: c.Rel, Name: in.Name}
+			}
 		}
 	}
 
@@ -42,6 +60,10 @@ func merge(c hypertext.Control, v Values) (map[string]any, error) {
 	}
 	for name, val := range v {
 		out[name] = val
+	}
+
+	if unchecked {
+		return out, nil
 	}
 
 	var missing []hypertext.Input

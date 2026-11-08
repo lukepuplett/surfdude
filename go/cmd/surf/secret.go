@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"strings"
+	"syscall"
 )
 
 // isTerminal says whether a file is a person at a keyboard, not a pipe or a file.
@@ -20,9 +20,10 @@ func isTerminal(f *os.File) bool {
 // because the standard library has no way to, and it will not fall back to showing what is typed: if
 // echo cannot be turned off it says so, and the secret can be piped in on standard input instead.
 //
-// It prompts on /dev/tty and not on standard output, so a prompt never ends up in a pipe. Echo is put
-// back when the line is read, and also if the person presses Ctrl-C, so a terminal is never left
-// silent.
+// It prompts on /dev/tty and not on standard output, so a prompt never ends up in a pipe. The work of
+// turning echo off, and of putting it back on every way out (a line, an error, a panic, Ctrl-C and a
+// terminate signal), is askHidden's, which is tested without a terminal. This part only connects it
+// to the real one.
 func readSecret(prompt string) (string, error) {
 	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 	if err != nil {
@@ -30,31 +31,26 @@ func readSecret(prompt string) (string, error) {
 	}
 	defer tty.Close()
 
-	if err := stty(tty, "-echo"); err != nil {
-		return "", errors.New("this terminal cannot hide typing; pipe the secret in on standard input instead")
-	}
-	restore := func() { _ = stty(tty, "echo") }
-	defer func() { restore(); fmt.Fprintln(tty) }()
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(signals)
 
-	interrupted := make(chan os.Signal, 1)
-	signal.Notify(interrupted, os.Interrupt)
-	defer signal.Stop(interrupted)
-	go func() {
-		if _, ok := <-interrupted; ok {
-			restore()
-			fmt.Fprintln(tty)
-			os.Exit(130)
-		}
-	}()
-
-	fmt.Fprint(tty, prompt)
-	line, err := bufio.NewReader(tty).ReadString('\n')
-	if err != nil && line == "" {
-		return "", errors.New("nothing was entered")
-	}
-
-	return strings.TrimRight(line, "\r\n"), nil
+	return askHidden(&ttyTerminal{tty: tty, reader: bufio.NewReader(tty)}, prompt, signals, os.Exit)
 }
+
+// ttyTerminal is the real terminal, /dev/tty, driven with stty because the standard library has no
+// way to turn echo off.
+type ttyTerminal struct {
+	tty    *os.File
+	reader *bufio.Reader
+}
+
+func (t *ttyTerminal) EchoOff() error { return stty(t.tty, "-echo") }
+func (t *ttyTerminal) EchoOn() error  { return stty(t.tty, "echo") }
+func (t *ttyTerminal) Write(text string) {
+	fmt.Fprint(t.tty, text)
+}
+func (t *ttyTerminal) ReadLine() (string, error) { return t.reader.ReadString('\n') }
 
 // stty runs stty on the terminal.
 func stty(tty *os.File, arg string) error {

@@ -331,6 +331,7 @@ type stepConfig struct {
 	expect         func(int) bool
 	retry          RetryPolicy
 	idempotencyKey bool
+	unchecked      bool
 }
 
 // Step changes how one step is taken.
@@ -361,6 +362,12 @@ func Expect(codes ...int) Step {
 		}
 	}
 }
+
+// Unchecked sends the values as given, without checking them against the form: an unknown field, a
+// missing required one, a value outside its schema and a changed read-only input all go through. It
+// is for a test or a probe that wants to see whether the server refuses what the form forbids, so
+// the form's own checks must not get in the way. Prefilled values are still sent.
+func Unchecked() Step { return func(c *stepConfig) { c.unchecked = true } }
 
 func config(opts []Step) stepConfig {
 	var c stepConfig
@@ -482,7 +489,7 @@ func (p *Page) prepare(ctx context.Context, controls []hypertext.Control, where,
 	}
 
 	cfg := config(opts)
-	vals, err := merge(c, cfg.values)
+	vals, err := mergeWith(c, cfg.values, cfg.unchecked)
 	if err != nil {
 		return nil, cfg, err
 	}

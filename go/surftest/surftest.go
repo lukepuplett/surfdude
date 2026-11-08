@@ -54,9 +54,17 @@ func Submit(t testing.TB, p *surf.Page, rel string, v surf.Values, opts ...surf.
 // test fails if the server accepted it.
 func Refused(t testing.TB, p *surf.Page, rel string, v surf.Values, status int) []hypertext.Problem {
 	t.Helper()
+	return RefusedPage(t, p, rel, v, status).Resource.Problems
+}
+
+// RefusedPage is Refused, and it returns the whole refusal page, so a journey can read what the
+// refusal offers next and its headers, such as Retry-After. The test fails if the server answered
+// with any other status.
+func RefusedPage(t testing.TB, p *surf.Page, rel string, v surf.Values, status int) *surf.Page {
+	t.Helper()
 	next, err := p.Submit(context.Background(), rel, v, surf.Expect(status))
 	if err != nil {
 		t.Fatal(err)
 	}
-	return next.Resource.Problems
+	return next
 }

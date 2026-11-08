@@ -14,6 +14,8 @@ import (
 var hiddenFieldNames = []string{
 	"credential", "token", "accesstoken", "refreshtoken", "password",
 	"secret", "clientsecret", "apikey", "privatekey", "authorization",
+	// Added on 2026-11-08 at Luke's word, after noticing an API could call a token apiToken.
+	"apitoken", "authtoken", "bearertoken", "idtoken", "sessiontoken", "userpassword",
 }
 
 // hiddenByName says whether a field name is on the hidden list. A dotted name, such as a nested

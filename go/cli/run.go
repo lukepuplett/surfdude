@@ -15,6 +15,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -49,6 +50,8 @@ type IO struct {
 	ReadSecret func(prompt string) (string, error)
 	// Client is the HTTP client. Nil means a default one with a timeout.
 	Client *http.Client
+	// Now is the clock the --trace lines are timed with. Nil means time.Now; tests give their own.
+	Now func() time.Time
 }
 
 const usageHead = `usage: surf [flags] ROOT                       show what the front door offers
@@ -59,7 +62,10 @@ const usageHead = `usage: surf [flags] ROOT                       show what the 
        surf [flags] show|explore ROOT          read an API, or crawl it and report problems
 
 values:  name=text   name:=JSON   name=@file   name=@-   name=env:VAR
-exit:    0 ok, 1 refused (4xx), 2 usage, 3 network, 4 server failed (5xx), 5 rel not offered`
+exit:    0 ok, 1 refused (4xx), 2 usage, 3 network, 4 server failed (5xx), 5 rel not offered,
+         130 interrupted at a secret prompt (143 if terminated)
+steps:   --keep NAME=PATH   --expect 422,429   --unchecked (send values the form forbids)
+         -v/--trace shows one line per step on stderr`
 
 // usageText is the usage text. Its hidden line is built from the list the masking uses, so the two
 // cannot disagree.
@@ -83,6 +89,7 @@ type flags struct {
 	tokenPath string
 	frontDoor bool
 	reveal    bool
+	trace     bool
 }
 
 // cmd is one run of the command.
@@ -112,6 +119,8 @@ func Run(args []string, std IO, env func(string) string) int {
 	fs.StringVar(&c.f.signIn, "sign-in", "", "values for the sign-in rel, such as 'credential=env:CRED': on a 401, sign in with them and try the step again once")
 	fs.StringVar(&c.f.tokenPath, "token-path", "data.0.token", "where the access token is in the sign-in response")
 	fs.BoolVar(&c.f.reveal, "reveal", false, "show values that are hidden because of their field name (see hidden: above); values you gave from --secret, @- or env:, and the bearer token, stay hidden")
+	fs.BoolVar(&c.f.trace, "trace", false, "print one line per step on stderr: its number, rel, method, status, time and the names it kept, and never a value")
+	fs.BoolVar(&c.f.trace, "v", false, "the same as --trace")
 	fs.BoolVar(&c.f.frontDoor, "front-door", false, "allow a step whose rel the last response does not offer to be taken from the front door, with a note on stderr (a missing control is the API's bug, so this is off by default)")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -346,14 +355,18 @@ func (c *cmd) runSteps(ctx context.Context, rootURL string, steps []step) int {
 			return c.usage(err)
 		}
 
-		req, err := page.Prepare(ctx, st.Rel, surf.With(vals))
+		extra := stepOptions(st)
+		req, err := page.Prepare(ctx, st.Rel, append([]surf.Step{surf.With(vals)}, extra...)...)
 		if err != nil {
 			return c.usage(withHint(err))
 		}
+		c.noteUnchecked(st)
 		c.announce(req, st.Rel, mask)
 
-		resp, err := page.Submit(ctx, st.Rel, vals)
+		began := c.now()
+		resp, err := page.Submit(ctx, st.Rel, vals, extra...)
 		if err != nil {
+			c.traceLine(fmt.Sprintf("step %d %s", i+1, st.Rel), req.Method, resp, c.since(began), nil)
 			return c.fail(resp, err)
 		}
 		for _, k := range st.Keeps {
@@ -368,10 +381,77 @@ func (c *cmd) runSteps(ctx context.Context, rootURL string, steps []step) int {
 			}
 			kept[k.Name] = keptValue{Text: text, Secret: c.masking().hidesKept(k)}
 		}
+		keptNames := make([]string, len(st.Keeps))
+		for j, k := range st.Keeps {
+			keptNames[j] = k.Name
+		}
+		c.traceLine(fmt.Sprintf("step %d %s", i+1, st.Rel), req.Method, resp, c.since(began), keptNames)
 		cur, last = resp, resp
 	}
 
 	return c.finish(last)
+}
+
+// now reads the clock the trace lines are timed with, and only when tracing is on, so a run without
+// --trace does not depend on it.
+func (c *cmd) now() time.Time {
+	if !c.f.trace {
+		return time.Time{}
+	}
+	if c.std.Now != nil {
+		return c.std.Now()
+	}
+
+	return time.Now()
+}
+
+// since is how long ago began was, by the same clock.
+func (c *cmd) since(began time.Time) time.Duration {
+	if !c.f.trace {
+		return 0
+	}
+
+	return c.now().Sub(began)
+}
+
+// traceLine prints one line on stderr about a step that was sent, if --trace was given: a label, the
+// method, the status the server answered (or "error" if it never did), the time taken, and the names
+// of the values the step kept. It never prints a value, so it is safe to leave on.
+func (c *cmd) traceLine(label, method string, page *surf.Page, took time.Duration, kept []string) {
+	if !c.f.trace {
+		return
+	}
+	status := "error"
+	if page != nil && page.Status != 0 {
+		status = strconv.Itoa(page.Status)
+	}
+	line := fmt.Sprintf("%s %s %s %dms", label, method, status, took.Milliseconds())
+	if len(kept) > 0 {
+		line += " kept=" + strings.Join(kept, ",")
+	}
+	fmt.Fprintln(c.std.Stderr, line)
+}
+
+// stepOptions are the library options a step's own flags ask for: the statuses it expects, and
+// whether to skip the checks against the form. The values are given separately.
+func stepOptions(st step) []surf.Step {
+	var opts []surf.Step
+	if len(st.Expect) > 0 {
+		opts = append(opts, surf.Expect(st.Expect...))
+	}
+	if st.Unchecked {
+		opts = append(opts, surf.Unchecked())
+	}
+
+	return opts
+}
+
+// noteUnchecked says, on stderr, that a step is about to send values that were not checked against the
+// form, so an unchecked request is never sent silently.
+func (c *cmd) noteUnchecked(st step) {
+	if st.Unchecked {
+		fmt.Fprintln(c.std.Stderr, "note: sending unchecked: these values are not checked against the form.")
+	}
 }
 
 // announce says, on stderr and before sending, what a step that changes something is about to do. A
@@ -438,7 +518,9 @@ func (c *cmd) signInHook(vals []value, root **surf.Page) surf.SignInFunc {
 		}
 		c.announce(req, "sign-in", mask)
 
+		began := c.now()
 		resp, err := page.Submit(ctx, "sign-in", values)
+		c.traceLine("sign-in", req.Method, resp, c.since(began), nil)
 		if err != nil {
 			return "", err
 		}
@@ -601,10 +683,11 @@ func (c *cmd) dryRun(ctx context.Context, root *surf.Page, steps []step, resolve
 		if err != nil {
 			return c.usage(err)
 		}
-		req, err := page.Prepare(ctx, st.Rel, surf.With(vals))
+		req, err := page.Prepare(ctx, st.Rel, append([]surf.Step{surf.With(vals)}, stepOptions(st)...)...)
 		if err != nil {
 			return c.usage(withHint(err))
 		}
+		c.noteUnchecked(st)
 		printPlan(c.std.Stdout, st.Rel, req, mask, c.masking())
 	}
 

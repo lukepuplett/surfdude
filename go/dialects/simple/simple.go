@@ -54,6 +54,8 @@ type input struct {
 	IsOptional bool     `json:"isOptional"`
 	Options    []string `json:"options"`
 	Value      any      `json:"value"`
+	// ReadOnly marks a value the API fixed: it is shown and sent, and not for editing.
+	ReadOnly bool `json:"readOnly"`
 }
 
 func (Dialect) Read(resp *http.Response, body []byte) (*hypertext.Resource, error) {
@@ -91,6 +93,9 @@ func controls(links []link) []hypertext.Control {
 					enum[i] = o
 				}
 				schema["enum"] = enum
+			}
+			if in.ReadOnly {
+				schema["readOnly"] = true
 			}
 			if len(schema) > 0 {
 				hin.Schema = schema

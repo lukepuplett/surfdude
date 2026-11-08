@@ -189,6 +189,11 @@ func (s *Surfer) checkControl(r *ExploreReport, opts ExploreOptions, p *Page, wh
 	default:
 		add("bad-control", fmt.Sprintf("%s has the method %q, which is not HTTP", c.Rel, c.Method))
 	}
+	// A value fixed in the href and an input of the same name offer one value as both "decided" and
+	// "yours to change". The API should say one or the other.
+	for _, name := range c.RepeatedFixedParams() {
+		add("bad-control", fmt.Sprintf("%s: field %q repeats a parameter fixed in the href", c.Rel, name))
+	}
 	if c.Form && len(c.Inputs) == 0 && c.HTTPMethod() != "GET" && c.HTTPMethod() != "DELETE" {
 		// A form with no inputs is legal (an action that needs nothing), so this is advice only.
 		return

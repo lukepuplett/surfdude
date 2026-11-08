@@ -53,13 +53,17 @@ func nonEmpty(parts ...string) []string {
 	return out
 }
 
-// fieldList names a control's fields, a star after each required one.
+// fieldList names a control's fields, a star after each required one and [fixed] after one the API
+// marked read-only: it is sent with the value the API gave it, and is not for editing.
 func fieldList(c hypertext.Control) string {
 	var names []string
 	for _, in := range c.Inputs {
 		name := in.Name
 		if in.Required {
 			name += "*"
+		}
+		if in.ReadOnly() {
+			name += "[fixed]"
 		}
 		names = append(names, name)
 	}
@@ -166,9 +170,11 @@ func isUsage(err error) bool {
 		missing    *hypertext.MissingInputError
 		invalid    *hypertext.InvalidInputError
 		unexpected *hypertext.UnexpectedInputError
+		readOnly   *hypertext.ReadOnlyInputError
 	)
 
-	return errors.As(err, &usage) || errors.As(err, &missing) || errors.As(err, &invalid) || errors.As(err, &unexpected)
+	return errors.As(err, &usage) || errors.As(err, &missing) || errors.As(err, &invalid) || errors.As(err, &unexpected) ||
+		errors.As(err, &readOnly)
 }
 
 // withHint adds the one piece of advice a typed value usually needs: numbers and booleans are written

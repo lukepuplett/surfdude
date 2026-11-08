@@ -143,10 +143,10 @@ func TestResolve_SecretMarking(t *testing.T) {
 		{arg{Name: "email", Kind: kindText, Raw: "a@b.test"}, false},
 		{arg{Name: "credential", Kind: kindText, Raw: "typed"}, true}, // by its full name
 		{arg{Name: "access_token", Kind: kindText, Raw: "typed"}, true},
-		{arg{Name: "userPassword", Kind: kindText, Raw: "typed"}, false}, // not a listed name
-		{arg{Name: "auth.token", Kind: kindText, Raw: "typed"}, true},    // a dotted name by its last part
-		{arg{Name: "agentKey", Kind: kindText, Raw: "agt_x"}, false},     // the agent key is public
-		{arg{Name: "email", Kind: kindEnv, Raw: "E"}, true},              // by its source
+		{arg{Name: "userPasswordHint", Kind: kindText, Raw: "typed"}, false}, // not a listed name
+		{arg{Name: "auth.token", Kind: kindText, Raw: "typed"}, true},        // a dotted name by its last part
+		{arg{Name: "agentKey", Kind: kindText, Raw: "agt_x"}, false},         // the agent key is public
+		{arg{Name: "email", Kind: kindEnv, Raw: "E"}, true},                  // by its source
 	}
 
 	for _, c := range cases {

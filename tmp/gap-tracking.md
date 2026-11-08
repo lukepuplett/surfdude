@@ -100,6 +100,19 @@ To port, copy the Go tests in `go/cli/` as the specification, not the code. What
 
 The one library change: Go's `Page.Prepare` (build a request without sending it, with the same checks as `Submit`). Python and C# need the equivalent for `--dry-run`.
 
+Added after that (Go, unreleased), to port with the same tests as the specification:
+
+| Go test file | What it specifies |
+|---|---|
+| `cli/expect_test.go` | `--expect 422,429` replaces "any 2xx" as the step's success; a surprise status (a 2xx too) fails with its usual code; the next rel must be on the expected page; a step expecting 401 does not sign in; bad lists are exit 2 with nothing sent |
+| `cli/unchecked_test.go`, `surf/unchecked_test.go`, `surf/unchecked_step_test.go` | `--unchecked` / `Unchecked()` skip the local checks (unknown field, missing required, schema, read-only) and nothing else; one stderr note naming no value; per step; dry run still masks |
+| `cli/trace_test.go` | `-v`: `step N rel METHOD STATUS Xms [kept=a,b]` on stderr; no value, ever; failing steps traced; injected clock |
+| `cmd/surf/prompt_test.go` | echo restored after a line, a failed read, a panic, Ctrl-C (exit 130) and SIGTERM (143); restore before exit; once only. Port the prompt behind a terminal interface and also check by hand under a real pty (`docs/cli.md`) |
+| `hypertext/fixed_test.go`, `surf/explore_collision_test.go`, `cli/fixed_test.go`, `dialects/*/readonly_test.go` | `readOnly` read into Input (agenttrader: from the schema; simple: `"readOnly": true`); a different caller value refused, the same accepted; fixed marks in `describe` and `next:`; a field repeating a literal fixed href parameter is an explorer problem and a `describe` warning (templates and values containing `{` are ignored) |
+| `surftest/refusedpage_test.go` | `RefusedPage` returns the refused page |
+
+Library semantics to port: `Unchecked` step option; `Input.ReadOnly`; `ReadOnlyInputError`; `Control.RepeatedFixedParams`; the explorer finding.
+
 ## Still open (not covered by the tests above)
 
 - Python is synchronous only. An async client (`httpx.AsyncClient`) is a separate piece of work and needs its own retry and sleep seam.

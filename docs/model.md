@@ -77,7 +77,7 @@ Rules that keep journeys small and safe:
 - Put **context that changes per page or per list item** on that item's controls (each search hit carries its own `listingId` in `fields[].value`, not a single global form).
 - Mark a field **required** only when the client must supply it and the server did not set `value`. If you set `value`, the client can submit with an empty map for the other fields.
 - Use **URI templates** when a value belongs in the path or query by REST habit; use **JSON body fields** (AgentTrader `_actions` / POST) for the rest. The client fills templates first, then sends leftover names in the body or query according to the method.
-- Do not rely on the client parsing **query strings on the link** as form state. If it is not in `inputs` / `fields` or in a `{template}` name, Surfdude will not treat it as a field.
+- A **query string on the link is fixed, not form state.** Surfdude keeps it and sends it unchanged, and does not turn a query parameter into a field. If a value is not in `inputs` / `fields` or in a `{template}` name, it is not editable. See *Fixed and editable values* below.
 
 How each shipped dialect spells a prefilled field:
 
@@ -86,6 +86,27 @@ How each shipped dialect spells a prefilled field:
 | **agenttrader** | `"value"` on each object in `_actions[].fields` | Go and Python read this into the model. See [fixtures/agenttrader/listings-search.json](../fixtures/agenttrader/listings-search.json). |
 | **simple** | `"value"` on each object in `links[].form[]` | Go, Python, and C# read it into the model and merge it on submit. Conformance: [fixtures/simple/prefilled-form.json](../fixtures/simple/prefilled-form.json). |
 | **C# simple client** | Same JSON shape | `IHypertextInputControl.Value` and merge in `BuildRequest` (prefill first, then `ThenSubmit` values). |
+
+### Fixed and editable values: an affordance is a permission
+
+A control tells a client what it is **welcome** to do. A field means "change this if you like". A value with no field means "this is decided, and changing it is not advisable". The shape of the control is how the API says which is which:
+
+| The API wants the client to... | It offers | Where fixed values live |
+|---|---|---|
+| go there, with nothing to decide | a link, no inputs | all in the `href`, already resolved |
+| choose some values | a form with one input for each editable value | the rest stay in the `href` |
+| send a value it should not change | a prefilled input, and `readOnly: true` in its schema | it travels as normal |
+
+The rules, from the client's side:
+
+1. **A link is sent as it is.** Its query string is fixed values, and the client does not edit it.
+2. **Only declared inputs and `{template}` names are editable.** Anything else a caller passes is refused locally, before a request is sent, with a message that lists what the control does accept.
+3. **The `href`'s query is kept.** For GET, HEAD and DELETE the declared values are added to it. An HTML GET form does the opposite: it throws the action's query away and uses only its fields. Surfdude keeps it, so a fixed value never needs a hidden input.
+4. **An input must not repeat a fixed parameter of the same `href`.** A scalar input with the same name *replaces* the fixed value, so the "fixed" value is not fixed. That is a mistake in the API, so Go's `Explore` reports it as a `bad-control` finding (`field "to" repeats a parameter fixed in the href`) and `surf describe` warns. Only a literal query is checked: a `{?to}` template, or a fixed value that itself contains `{`, is not.
+5. **`value` is a suggestion, not a lock, unless the schema says `readOnly: true`.** Surfdude merges prefilled values and lets the caller override them, like HTML's `value`. JSON Schema `readOnly` is the way for an API to say "shown, sent, not for editing", and Go reads it (the agenttrader dialect carries the schema as it is; the simple dialect takes `"readOnly": true` on a form field and puts it in the schema). A read-only input keeps its prefilled value: leaving it out, or giving the same value, is fine; giving a different one is refused locally with `*hypertext.ReadOnlyInputError`, before anything is sent. A read-only input with no prefilled value accepts no caller value at all.
+6. **Fixed is advice, not security.** A tool can send anything. A server must validate every value it receives, and Go's `surf.Unchecked()` step (and the CLI's `--unchecked`) exists so a test can send what the form forbids, a field the form does not have, a missing required field, a value the schema refuses or a changed read-only value, and check the server refuses it too. It skips the local checks only: prefilled values are still merged, and the request is otherwise the same.
+
+AgentTrader writes the same rules from the API author's side, with worked examples: [Affordances are permissions](https://github.com/lukepuplett/agenttrader/blob/main/doc/hypermedia-api.md#affordances-are-permissions).
 
 ### If you write the journey (client code)
 

@@ -31,6 +31,11 @@ func (c *cmd) describe(ctx context.Context, rootURL, rel string) int {
 		ctrl.Href = root.URL.Scheme + "://" + root.URL.Host + ctrl.Href
 	}
 	describeControl(c.std.Stdout, rootURL, ctrl, c.masking())
+	// A field that repeats a value the href already fixes is a mistake in the API, not in the command,
+	// so describe still succeeds and says so on stderr.
+	for _, name := range ctrl.RepeatedFixedParams() {
+		fmt.Fprintf(c.std.Stderr, "warning: field %q repeats a parameter fixed in the href.\n", name)
+	}
 
 	return ExitOK
 }
@@ -59,6 +64,7 @@ func describeControl(w io.Writer, root string, c hypertext.Control, m masking) {
 	type field struct {
 		name, detail string
 		required     bool
+		fixed        bool // read-only: the API decided it, so a step need not and may not give it
 		token        string
 	}
 	var fields []field
@@ -69,6 +75,7 @@ func describeControl(w io.Writer, root string, c hypertext.Control, m masking) {
 			name:     in.Name,
 			detail:   inputDetail(in, m),
 			required: in.Required && in.Value == nil,
+			fixed:    in.ReadOnly(),
 			token:    fieldToken(in.Name, in.Schema),
 		})
 	}
@@ -101,9 +108,12 @@ func describeControl(w io.Writer, root string, c hypertext.Control, m masking) {
 	line := "surf " + root + " " + c.Rel
 	var optional []string
 	for _, f := range fields {
-		if f.required {
+		switch {
+		case f.fixed:
+			// The API decided this value, so the line to start from does not ask for it.
+		case f.required:
 			line += " " + f.token
-		} else {
+		default:
 			optional = append(optional, "["+f.token+"]")
 		}
 	}
@@ -159,11 +169,19 @@ func inputDetail(in hypertext.Input, m masking) string {
 	if d, ok := in.Schema["description"].(string); ok && d != "" {
 		detail += " - " + d
 	}
+	shown := ""
 	if in.Value != nil {
-		shown := fmt.Sprint(in.Value)
+		shown = fmt.Sprint(in.Value)
 		if m.hides(in.Name) {
 			shown = secretMask
 		}
+	}
+	switch {
+	case in.ReadOnly() && in.Value != nil:
+		detail += " (fixed by the API: " + shown + ")"
+	case in.ReadOnly():
+		detail += " (fixed by the API)"
+	case in.Value != nil:
 		detail += " (prefilled: " + shown + ")"
 	}
 

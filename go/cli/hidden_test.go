@@ -13,7 +13,10 @@ import (
 
 // Scenario: the list is exactly the one Luke approved
 func TestHiddenFieldNames_IsTheApprovedList(t *testing.T) {
-	want := []string{"accesstoken", "apikey", "authorization", "clientsecret", "credential", "password", "privatekey", "refreshtoken", "secret", "token"}
+	want := []string{
+		"accesstoken", "apikey", "apitoken", "authorization", "authtoken", "bearertoken", "clientsecret", "credential",
+		"idtoken", "password", "privatekey", "refreshtoken", "secret", "sessiontoken", "token", "userpassword",
+	}
 
 	got := append([]string(nil), hiddenFieldNames...)
 	sort.Strings(got)
@@ -36,6 +39,12 @@ func TestHiddenByName_HidesTheListedNamesAndTheirVariants(t *testing.T) {
 		"apiKey", "api_key", "api-key", "API-Key", "API_KEY",
 		"privateKey", "private_key", "private-key",
 		"authorization", "Authorization", "AUTHORIZATION",
+		"apiToken", "api_token", "API-TOKEN",
+		"authToken", "auth_token", "auth-token",
+		"bearerToken", "bearer_token", "Bearer-Token",
+		"idToken", "id_token", "ID-TOKEN",
+		"sessionToken", "session_token", "SESSION-TOKEN",
+		"userPassword", "user_password", "USER-PASSWORD",
 		"user.password", "data.0.credential", "a.b.client_secret",
 	} {
 		if !hiddenByName(name) {
@@ -48,7 +57,7 @@ func TestHiddenByName_HidesTheListedNamesAndTheirVariants(t *testing.T) {
 func TestHiddenByName_ShowsNearMisses(t *testing.T) {
 	for _, name := range []string{
 		"passwordWasRight", "tokenizer", "secretary", "keyboard", "tokens", "credentials",
-		"userPassword", "apiToken", "authToken", "secretKey", "mysecret", "passwordHint",
+		"secretKey", "mysecret", "passwordHint", "tokenCount", "sessionTokenCount", "idTokenHint", "userPasswordHint",
 		"agentKey", "email", "code", "key", "otp", "pin",
 		"", "password.count", "token.",
 	} {
