@@ -2,7 +2,9 @@
 
 Go and Python share one version. The .NET packages have their own, because they were already on 1.x on nuget.org (`Surfdude` and `Surfdude.SimpleJson.Client` 1.0.3) when the others were on 0.x. While a major version is 0, a minor release can break the API, and each break is listed first.
 
-## Unreleased
+## 0.5.0
+
+The first release where the `surf` command can send, not only read (Go only; the Python package is republished at 0.5.0 with no code change, because Go and Python share one version). Also fixes the GoReleaser repository name, which still said `surfdude-csharp` after the rename.
 
 ### Added
 

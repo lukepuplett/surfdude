@@ -40,5 +40,5 @@ changelog:
 release:
   github:
     owner: lukepuplett
-    name: surfdude-csharp
+    name: surfdude
   name_template: "v{{ .Version }}"
