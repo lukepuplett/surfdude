@@ -2,6 +2,20 @@
 
 Go and Python share one version. The .NET packages have their own, because they were already on 1.x on nuget.org (`Surfdude` and `Surfdude.SimpleJson.Client` 1.0.3) when the others were on 0.x. While a major version is 0, a minor release can break the API, and each break is listed first.
 
+## 0.6.0
+
+### Added
+
+- **Go: pluggable challenge handlers** — `surf.Challenge`, `surf.WithChallenges`, `surf.ChallengeContext`. After `finish` on an unexpected status, registered matchers may run a handler; on success the surfer **rewinds and retries the request once** (same pattern as `WithSignIn`).
+- **Go: x402 vs envelope 402** — `surf.MatchX402Payment`, `surf.IsX402Body`; `agenttrader.MatchCapabilityGap(status, missing)` for AgentTrader envelope `missing` (requires profile `Link`, excludes x402 bodies).
+- **Go: envelope `missing`** on `hypertext.Resource` (agenttrader dialect).
+- **Python: pluggable challenge handlers** — `Challenge`, `Surfer.new(..., challenges=)`, `ChallengeContext`; same rewind-and-retry-once behaviour as Go after an unexpected status.
+- **Python: x402 vs envelope 402** — `surf.x402_match.match_x402_payment`, `is_x402_body`; `dialects.agenttrader_match.match_capability_gap` and envelope probe helpers.
+- **Python: envelope `missing`** on `hypertext.Resource` (agenttrader dialect).
+- **C#: pluggable challenge handlers** — `Challenge`, `Surfer.WithChallenges` / `AgentTraderSurfer.WithChallenges`, `ChallengeContext` on `SurfContext.Challenges`; `HttpStep` runs matchers and replays the captured request once.
+- **C#: x402 vs envelope 402** — `X402Match`; `AgentTraderMatch.MatchCapabilityGap` and envelope probe helpers.
+- **C#: envelope `missing`** on `AgentTraderResource` (agenttrader dialect).
+
 ## 0.5.0
 
 The first release where the `surf` command can send, not only read (Go only; the Python package is republished at 0.5.0 with no code change, because Go and Python share one version). Also fixes the GoReleaser repository name, which still said `surfdude-csharp` after the rename.

@@ -39,9 +39,10 @@ type Surfer struct {
 	signIn  SignInFunc
 	signMu  sync.Mutex // one sign-in at a time, so steps that fail together share it
 	agent   string
-	retry   RetryPolicy
-	sleep   func(context.Context, time.Duration) error
-	timeout time.Duration
+	retry      RetryPolicy
+	challenges []Challenge
+	sleep      func(context.Context, time.Duration) error
+	timeout    time.Duration
 }
 
 // Option configures a Surfer.
@@ -233,6 +234,7 @@ func (s *Surfer) do(req *http.Request, step string, expected func(int) bool, pol
 	req.Header.Set("User-Agent", s.agent)
 
 	signedInAgain := false
+	challengedAgain := false
 	for attempt := 1; ; attempt++ {
 		ex := s.exchange(req)
 
@@ -256,6 +258,25 @@ func (s *Surfer) do(req *http.Request, step string, expected func(int) bool, pol
 		}
 
 		failed := ex.err != nil || !expected(ex.resp.StatusCode)
+		if failed && ex.err == nil && !challengedAgain && replayable(req) {
+			refused, _ := s.finish(req, step, expected, ex, attempt)
+			if refused != nil {
+				challengeMu.Lock()
+				retry, err := s.tryChallenges(req.Context(), req, step, refused)
+				challengeMu.Unlock()
+				if err != nil {
+					return refused, fmt.Errorf("Unable to %s. %w", step, err)
+				}
+				if retry {
+					next, err := rewind(req)
+					if err != nil {
+						return refused, fmt.Errorf("Unable to %s. The request body could not be rebuilt after the challenge: %w", step, err)
+					}
+					req, challengedAgain = next, true
+					continue
+				}
+			}
+		}
 		if failed && req.Context().Err() == nil && replayable(req) {
 			a := RetryAttempt{Number: attempt, Method: req.Method, Err: ex.err, Idempotent: idempotent(req)}
 			if ex.resp != nil {

@@ -31,7 +31,11 @@ namespace Evoq.Surfdude.Hypertext.AgentTrader
                 }
             }
 
-            return new AgentTraderResource(new AgentTraderControlSet(ReadControls(root, baseUri)), items);
+            var missing = root.TryGetProperty("missing", out var missingEl) && missingEl.ValueKind == JsonValueKind.String
+                ? missingEl.GetString()
+                : string.Empty;
+
+            return new AgentTraderResource(new AgentTraderControlSet(ReadControls(root, baseUri)), items, missing);
         }
 
         //

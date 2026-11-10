@@ -1,7 +1,9 @@
 namespace Evoq.Surfdude
 {
+    using Evoq.Surfdude.Hypertext.Http;
     using Microsoft.Extensions.Logging;
     using System;
+    using System.Collections.Generic;
     using System.Net.Http;
 
     /// <summary>
@@ -14,12 +16,14 @@ namespace Evoq.Surfdude
     {
         private readonly HttpClient httpClient;
         private readonly ILoggerFactory loggerFactory;
+        private readonly IReadOnlyList<Challenge> challenges;
 
-        private AgentTraderSurfer(string rootUri, HttpClient httpClient, ILoggerFactory loggerFactory)
+        private AgentTraderSurfer(string rootUri, HttpClient httpClient, ILoggerFactory loggerFactory, IReadOnlyList<Challenge> challenges)
         {
             this.RootUri = rootUri;
             this.httpClient = httpClient;
             this.loggerFactory = loggerFactory;
+            this.challenges = challenges ?? Array.Empty<Challenge>();
         }
 
         //
@@ -35,7 +39,7 @@ namespace Evoq.Surfdude
                 throw new ArgumentNullOrWhitespaceException(nameof(rootUri));
             }
 
-            return new AgentTraderSurfer(rootUri, httpClient: null, loggerFactory: null);
+            return new AgentTraderSurfer(rootUri, httpClient: null, loggerFactory: null, challenges: null);
         }
 
         public AgentTraderSurfer WithHttpClient(HttpClient httpClient)
@@ -43,12 +47,18 @@ namespace Evoq.Surfdude
             return new AgentTraderSurfer(
                 this.RootUri,
                 httpClient ?? throw new ArgumentNullException(nameof(httpClient)),
-                this.loggerFactory);
+                this.loggerFactory,
+                this.challenges);
         }
 
         public AgentTraderSurfer WithLoggerFactory(ILoggerFactory loggerFactory)
         {
-            return new AgentTraderSurfer(this.RootUri, this.httpClient, loggerFactory);
+            return new AgentTraderSurfer(this.RootUri, this.httpClient, loggerFactory, this.challenges);
+        }
+
+        public AgentTraderSurfer WithChallenges(params Challenge[] challenges)
+        {
+            return new AgentTraderSurfer(this.RootUri, this.httpClient, this.loggerFactory, challenges ?? Array.Empty<Challenge>());
         }
 
         public IWaveStart Wave()
@@ -58,7 +68,10 @@ namespace Evoq.Surfdude
 
         public IWaveStart Wave(Action<SurfContext> configure)
         {
-            var context = new SurfContext(this.RootUri, this.loggerFactory);
+            var context = new SurfContext(this.RootUri, this.loggerFactory)
+            {
+                Challenges = new List<Challenge>(this.challenges),
+            };
 
             configure?.Invoke(context);
 

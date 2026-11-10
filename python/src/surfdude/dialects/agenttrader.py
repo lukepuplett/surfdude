@@ -34,9 +34,13 @@ class AgentTraderDialect:
 
     def read(self, response: HTTPResponse) -> Resource:
         env = json.loads(response.body)
+        missing = env.get("missing") or ""
+        if not isinstance(missing, str):
+            missing = str(missing)
         res = Resource(
             status=env.get("status") or response.status_code,
             message=env.get("message", ""),
+            missing=missing,
             notes=list(env.get("notes") or []),
             controls=_to_controls(env.get("_links") or [], env.get("_actions") or []),
             body=response.body,

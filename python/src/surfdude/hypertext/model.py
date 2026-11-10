@@ -81,6 +81,7 @@ class Item:
 class Resource:
     status: int = 0
     message: str = ""
+    missing: str = ""
     notes: list[str] = field(default_factory=list)
     paging: Paging | None = None
     controls: list[Control] = field(default_factory=list)

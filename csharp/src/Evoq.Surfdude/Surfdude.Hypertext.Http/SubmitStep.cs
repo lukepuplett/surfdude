@@ -29,7 +29,7 @@
             
             var httpRequest = this.StepContext.ResourceFormatter.BuildRequest(new SendDictionary(this.SendModel), senderControl);
 
-            return this.SendAsync(httpRequest, cancellationToken);
+            return this.SendReplayableAsync(httpRequest, cancellationToken);
         }
     }
 }

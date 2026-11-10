@@ -28,14 +28,50 @@
 
         protected internal HttpResponseMessage Response { get; set; }
 
+        protected ReplayableRequest LastReplayable { get; private set; }
+
         //
 
         public async Task ExecuteAsync(IStep previous, CancellationToken cancellationToken)
         {
             this.Response = await this.ExecuteStepRequestAsync((HttpStep)previous, cancellationToken);
 
-            if (!this.IsExpectedStatus(this.Response.StatusCode))
+            var challenged = false;
+            while (!this.IsExpectedStatus(this.Response.StatusCode))
             {
+                if (!challenged && this.LastReplayable != null)
+                {
+                    var body = await this.Response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+                    IHypertextResource refused;
+                    try
+                    {
+                        refused = await this.StepContext.ResourceFormatter.ReadAsResourceAsync(this.Response).ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        refused = null;
+                    }
+
+                    if (refused != null)
+                    {
+                        var retry = await ChallengeRunner.TryAsync(
+                            this.StepContext,
+                            refused,
+                            this.Response,
+                            body,
+                            cancellationToken).ConfigureAwait(false);
+                        if (retry)
+                        {
+                            challenged = true;
+                            this.Response?.Dispose();
+                            this.Response = await this.SendReplayableAsync(
+                                this.LastReplayable.CreateAgain(),
+                                cancellationToken).ConfigureAwait(false);
+                            continue;
+                        }
+                    }
+                }
+
                 try
                 {
                     this.Response.EnsureSuccessStatusCode();
@@ -72,9 +108,15 @@
             return this.StepContext.HttpClient.SendAsync(request, cancellationToken);
         }
 
+        protected async Task<HttpResponseMessage> SendReplayableAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            this.LastReplayable = await ReplayableRequest.CaptureAsync(request, cancellationToken).ConfigureAwait(false);
+            return await this.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+
         protected Task<HttpResponseMessage> GetAsync(string uri, CancellationToken cancellationToken)
         {
-            return this.SendAsync(new HttpRequestMessage(HttpMethod.Get, new Uri(uri, UriKind.RelativeOrAbsolute)), cancellationToken);
+            return this.SendReplayableAsync(new HttpRequestMessage(HttpMethod.Get, new Uri(uri, UriKind.RelativeOrAbsolute)), cancellationToken);
         }
 
         internal abstract Task<HttpResponseMessage> ExecuteStepRequestAsync(HttpStep previous, CancellationToken cancellationToken);

@@ -145,4 +145,9 @@ What it showed:
 
 The rule in `docs/model.md` ("Core parts and extras") is now built everywhere. `Requires`, `Price`, `Type` and `Title` are gone from the Go and Python `Control`; the dialects keep every key the model has no field for as an extension (`Control.Extensions` in Go, `Control.extensions` in Python, `ControlData` in C#). The preflight, `RequiresNotMetError`, `PaymentRequiredError`, `NonHypermediaControlError` and Go's `hypertext.Price` were removed. `fixtures/agenttrader/cases.json` expects `extensions.requires`, and Go, Python and C# check it.
 
-Breaking for anyone who used those fields or errors. Left to do: a 402 handler and the x402 parser, and a challenge registry so 401 and 402 share one mechanism.
+Breaking for anyone who used those fields or errors.
+
+## Done in v0.6.0: challenge registry (Go, Python; C# in repo)
+
+- **Pluggable challenges** in the surf library: ordered matchers on status, headers and body; handler runs on the refused page; **one replay** of the failed request (same idea as sign-in). Go: `WithChallenges`, `Challenge`; agenttrader `MatchCapabilityGap` vs `IsX402Body` / `MatchX402Payment`; envelope `missing` on the resource. Python: `Surfer.new(..., challenges=)`, `test_challenge.py` (57 pytest pass, 2026-11-10). C#: `WithChallenges`, `ChallengeHandlerTests.cs` — **not run on every dev box**: test projects target **net10.0**; SDK 9.0 refuses restore (`NETSDK1045`). Verify with .NET 10 SDK or CI that already builds net10.
+- **Still left:** x402 **payment execution** (wallet header retry), a full x402 parser/dialect, and wiring challenges into CLI send (Go CLI unchanged). `WithSignIn` remains separate from the registry; unifying 401 into one registry is optional later. C# optional: re-entry guard on challenge handlers (Go/Python have one).

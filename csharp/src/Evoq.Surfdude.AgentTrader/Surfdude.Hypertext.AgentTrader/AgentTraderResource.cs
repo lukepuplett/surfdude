@@ -8,13 +8,16 @@ namespace Evoq.Surfdude.Hypertext.AgentTrader
         private readonly AgentTraderControlSet controls;
         private readonly IReadOnlyList<AgentTraderControlSet> items;
 
-        public AgentTraderResource(AgentTraderControlSet controls, IReadOnlyList<AgentTraderControlSet> items)
+        public AgentTraderResource(AgentTraderControlSet controls, IReadOnlyList<AgentTraderControlSet> items, string missing = null)
         {
             this.controls = controls ?? throw new ArgumentNullException(nameof(controls));
             this.items = items ?? throw new ArgumentNullException(nameof(items));
+            this.Missing = missing ?? string.Empty;
         }
 
         //
+
+        public string Missing { get; }
 
         public IEnumerable<string> Rels => this.controls.Rels;
 

@@ -131,6 +131,7 @@ func (i Item) Decode(into any) error { return json.Unmarshal(i.Data, into) }
 type Resource struct {
 	Status   int
 	Message  string
+	Missing  string
 	Notes    []string
 	Paging   *Paging
 	Controls []Control

@@ -25,6 +25,7 @@ from surfdude.hypertext import (
     UnexpectedStatusError,
 )
 from surfdude.surf.request import build_request, response_from_httpx
+from surfdude.surf.challenge import Challenge, challenging, try_challenges
 from surfdude.surf.retry import RetryAttempt, RetryPolicy, is_idempotent, never
 from surfdude.surf.values import Values, merge
 
@@ -222,6 +223,7 @@ class Surfer:
     retry: RetryPolicy | None = None
     sleep: Callable[[float], None] = field(default=time.sleep)
     sign_in: SignInFunc | None = None
+    challenges: list[Challenge] = field(default_factory=list)
     _sign_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     @classmethod
@@ -234,6 +236,7 @@ class Surfer:
         timeout: float = 30.0,
         sleep: Callable[[float], None] | None = None,
         sign_in: SignInFunc | None = None,
+        challenges: list[Challenge] | None = None,
     ) -> Surfer:
         if not dialects:
             raise ValueError("Unable to start. A Surfer needs at least one dialect.")
@@ -248,6 +251,7 @@ class Surfer:
             retry=retry,
             sleep=sleep or time.sleep,
             sign_in=sign_in,
+            challenges=list(challenges or ()),
         )
 
     def set_bearer(self, token: str) -> None:
@@ -300,6 +304,7 @@ class Surfer:
 
         attempts = 1
         signed_in_again = False
+        challenged_again = False
         while True:
             resp, error = self._send(req)
             if error is None and expect(resp.status_code):
@@ -326,6 +331,30 @@ class Surfer:
                 req = _rebuilt(req, self.token)
                 signed_in_again = True
                 continue
+
+            if (
+                error is None
+                and self.challenges
+                and not challenged_again
+                and not expect(resp.status_code)
+                and not challenging()
+                and _replayable(req)
+            ):
+                refused = self._page_from(resp, attempts)
+                retry, ch_err = try_challenges(self, step, refused, self.challenges)
+                if ch_err is not None:
+                    raise UnexpectedStatusError(
+                        step=step,
+                        status=resp.status_code,
+                        message=f'Challenge failed while {step}: {ch_err}',
+                        resource=refused.resource,
+                        attempts=attempts,
+                        url=refused.url,
+                    ) from ch_err
+                if retry:
+                    req = _rebuilt(req, self.token)
+                    challenged_again = True
+                    continue
 
             wait = policy(
                 RetryAttempt(

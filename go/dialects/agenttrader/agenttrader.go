@@ -56,6 +56,7 @@ func (Dialect) Matches(resp *http.Response, body []byte) bool {
 type envelope struct {
 	Status  int               `json:"status"`
 	Message string            `json:"message"`
+	Missing string            `json:"missing,omitempty"`
 	Notes   []string          `json:"notes"`
 	Data    []json.RawMessage `json:"data"`
 	Paging  *struct {
@@ -157,7 +158,7 @@ func (Dialect) Read(resp *http.Response, body []byte) (*hypertext.Resource, erro
 	}
 
 	res := &hypertext.Resource{
-		Status: env.Status, Message: env.Message, Notes: env.Notes,
+		Status: env.Status, Message: env.Message, Missing: env.Missing, Notes: env.Notes,
 		Controls: toControls(env.Links, env.Actions), Body: body,
 	}
 	if res.Status == 0 {
