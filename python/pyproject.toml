@@ -3,6 +3,7 @@ name = "surfdude"
 version = "0.6.0"
 description = "Hypermedia API client: drive journeys by rel, not URLs"
 readme = "README.md"
+license = "MIT"
 authors = [{ name = "Luke Puplett", email = "lpuplett@pacificam.co.uk" }]
 requires-python = ">=3.12"
 dependencies = ["httpx>=0.28.1"]
