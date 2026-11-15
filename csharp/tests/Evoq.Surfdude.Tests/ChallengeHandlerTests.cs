@@ -67,7 +67,16 @@ namespace Evoq.Surfdude.Tests
 
             public bool Credited { get; private set; }
 
-            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            // A real handler sets RequestMessage on every response, and the reader resolves a relative
+            // action against it, so this fake must too or its relative actions cannot be followed.
+            protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                var response = await this.Handle(request).ConfigureAwait(false);
+                response.RequestMessage = request;
+                return response;
+            }
+
+            private Task<HttpResponseMessage> Handle(HttpRequestMessage request)
             {
                 string path = request.RequestUri.AbsolutePath;
 

@@ -24,8 +24,8 @@ from surfdude.hypertext import (
     UnexpectedInputError,
     UnexpectedStatusError,
 )
-from surfdude.surf.request import build_request, response_from_httpx
 from surfdude.surf.challenge import Challenge, challenging, try_challenges
+from surfdude.surf.request import build_request, response_from_httpx
 from surfdude.surf.retry import RetryAttempt, RetryPolicy, is_idempotent, never
 from surfdude.surf.values import Values, merge
 

@@ -28,7 +28,7 @@
 
         protected internal HttpResponseMessage Response { get; set; }
 
-        protected ReplayableRequest LastReplayable { get; private set; }
+        private ReplayableRequest LastReplayable { get; set; }
 
         //
 
