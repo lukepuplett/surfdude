@@ -2,6 +2,16 @@
 
 Go and Python share one version. The .NET packages have their own, because they were already on 1.x on nuget.org (`Surfdude` and `Surfdude.SimpleJson.Client` 1.0.3) when the others were on 0.x. While a major version is 0, a minor release can break the API, and each break is listed first.
 
+## 0.6.1
+
+Replaces 0.6.0, whose release never published: CI failed on the C# build and on a Python lint rule, so the `v0.6.0` and `go/v0.6.0` tags exist but PyPI and the GitHub release stayed at 0.5.0. Use 0.6.1; it has the same features and no API change.
+
+### Fixed
+
+- **C#: the v0.6.0 code did not compile.** `Challenge.cs` was missing `using System.Net.Http.Headers;`, and `HttpStep.LastReplayable` exposed an internal type from a protected member. It is now private.
+- **Python: import order** in `surf/surfer.py` (ruff).
+- **C#: the new challenge handler tests had never run.** Their fake server did not set `RequestMessage` on responses, so a relative action could not be resolved. A real `HttpClient` always sets it, so this was a test fault, not a library one.
+
 ## 0.6.0
 
 ### Added
