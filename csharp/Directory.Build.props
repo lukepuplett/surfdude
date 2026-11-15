@@ -5,4 +5,19 @@
     <Version>1.1.0</Version>
     <PackageVersion>1.1.0</PackageVersion>
   </PropertyGroup>
+
+  <PropertyGroup Condition="$(MSBuildProjectDirectory.Contains('tests'))">
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IsPackable)' != 'false'">
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/lukepuplett/surfdude</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/lukepuplett/surfdude</RepositoryUrl>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsPackable)' != 'false'">
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 </Project>
